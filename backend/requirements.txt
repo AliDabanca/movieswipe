@@ -1,0 +1,18 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.6
+pydantic-settings==2.7.2
+
+# Database
+sqlalchemy[asyncio]==2.0.38
+asyncpg==0.31.0
+supabase==2.14.2
+
+# Redis
+redis==5.2.2
+
+# Environment
+python-dotenv==1.0.1
+
+# Vector operations (for future use)
+pgvector==0.3.8

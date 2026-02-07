@@ -1,0 +1,4 @@
+- Flutter tarafında klasör yapısına (data/domain/presentation) sadık kal.
+- Backend'de her endpoint için mutlaka tip tanımı (Pydantic modelleri) kullan.
+- Vektör işlemleri için her zaman asenkron (async/await) yapıları tercih et.
+- Hata yönetimini (Try-Catch) en baştan profesyonelce kur.

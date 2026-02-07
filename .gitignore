@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Environment files
+.env
+.env.dev
+.env.test
+.env.prod
+mobile/.env
+!.env.example
