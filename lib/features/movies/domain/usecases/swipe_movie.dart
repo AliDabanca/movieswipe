@@ -11,7 +11,36 @@ class SwipeMovie {
   Future<Either<Failure, void>> call({
     required int movieId,
     required bool isLike,
+    required String userId,
   }) async {
-    return await repository.swipeMovie(movieId, isLike);
+    // Retry logic: 3 attempts with exponential backoff
+    int attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      attempts++;
+      
+      final result = await repository.swipeMovie(movieId, isLike, userId);
+      
+      // If successful, return immediately
+      if (result.isRight()) {
+        print('✅ Swipe saved successfully on attempt $attempts');
+        return result;
+      }
+      
+      // If this was the last attempt, return the error
+      if (attempts >= maxAttempts) {
+        print('❌ Swipe failed after $maxAttempts attempts');
+        return result;
+      }
+      
+      // Wait before retrying (exponential backoff: 500ms, 1s, 2s)
+      final delayMs = 500 * (1 << (attempts - 1));
+      print('⏳ Swipe attempt $attempts failed, retrying in ${delayMs}ms...');
+      await Future.delayed(Duration(milliseconds: delayMs));
+    }
+    
+    // This should never be reached, but just in case
+    return Left(ServerFailure('Failed to save swipe after $maxAttempts attempts'));
   }
 }

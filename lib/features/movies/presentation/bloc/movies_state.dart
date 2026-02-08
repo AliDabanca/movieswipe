@@ -25,6 +25,16 @@ class MoviesLoaded extends MoviesState {
   List<Object> get props => [movies];
 }
 
+/// Search results state
+class MoviesSearchLoaded extends MoviesState {
+  final List<Movie> movies;
+
+  const MoviesSearchLoaded({required this.movies});
+
+  @override
+  List<Object> get props => [movies];
+}
+
 /// Error state
 class MoviesError extends MoviesState {
   final String message;

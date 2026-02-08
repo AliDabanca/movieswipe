@@ -1,11 +1,18 @@
-"""Configuration management using environment variables."""
+"""Application configuration using pydantic-settings."""
 
-from pydantic_settings import BaseSettings
-from typing import Optional
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings."""
+    """Application settings loaded from environment variables."""
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore"
+    )
+
+    # Database
 
     # Database
     supabase_url: str = "your_supabase_url"
@@ -23,11 +30,10 @@ class Settings(BaseSettings):
     debug: bool = True
 
     # CORS
-    cors_origins: list[str] = ["http://localhost:*", "http://127.0.0.1:*"]
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    cors_origins: list = ["*"]
+    
+    # TMDB API
+    tmdb_api_key: str = ""
 
 
 # Global settings instance

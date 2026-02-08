@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.errors import DomainException, NotFoundError, ValidationError
-from app.presentation.api.routes import movies
+from app.presentation.api.routes import movies, recommendations, users, sync, search
 
 # Create FastAPI app
 app = FastAPI(
@@ -71,3 +71,7 @@ async def health_check():
 
 # Include routers
 app.include_router(movies.router)
+app.include_router(recommendations.router)
+app.include_router(users.router)
+app.include_router(sync.router)
+app.include_router(search.router)

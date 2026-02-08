@@ -74,22 +74,26 @@ async def swipe_movie(
 
     Args:
         movie_id: The movie ID
-        request: Swipe request with isLike boolean
-
+        request: Swipe request with isLike boolean and userId
+    
     Returns:
-        MessageResponse: Success message
+        Success message
     """
     try:
-        await repository.swipe(movie_id, request.isLike)
-        action = "liked" if request.isLike else "passed"
-        return MessageResponse(message=f"Movie {movie_id} {action} successfully")
-    except NotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e.message),
-        )
+        # Get user_id from request body
+        user_id = request.userId
+        
+        # Save swipe via repository
+        await repository.swipe(movie_id, request.isLike, user_id)
+        
+        action = "LIKE" if request.isLike else "PASS"
+        print(f"✅ Swipe saved to DB: User {user_id} - Movie {movie_id} - {action}")
+        
+        return MessageResponse(message=f"Movie {action.lower()}d successfully")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to swipe movie: {str(e)}",
+            detail=f"Failed to save swipe: {str(e)}",
         )

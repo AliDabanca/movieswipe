@@ -24,6 +24,6 @@ class MovieRepository(ABC):
         pass
 
     @abstractmethod
-    async def swipe(self, movie_id: int, is_like: bool) -> None:
+    async def swipe(self, movie_id: int, is_like: bool, user_id: str) -> None:
         """Record a swipe action."""
         pass

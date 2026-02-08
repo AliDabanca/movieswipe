@@ -46,10 +46,54 @@ class MovieRepositoryImpl implements MovieRepository {
   }
 
   @override
-  Future<Either<Failure, void>> swipeMovie(int movieId, bool isLike) async {
+  Future<Either<Failure, List<Movie>>> getRecommendedMovies() async {
     try {
-      await remoteDataSource.swipeMovie(movieId, isLike);
+      // Get personalized recommendations from backend
+      final remoteMovies = await remoteDataSource.getRecommendedMovies();
+      
+      // Cache the result
+      await localDataSource.cacheMovies(remoteMovies);
+      
+      // Convert models to entities
+      final movies = remoteMovies.map((model) => model.toEntity()).toList();
+      
+      return Right(movies);
+    } on ServerException catch (e) {
+      // Fallback to regular movies on failure
+      try {
+        final cachedMovies = await localDataSource.getCachedMovies();
+        final movies = cachedMovies.map((model) => model.toEntity()).toList();
+        return Right(movies);
+      } catch (_) {
+        return Left(ServerFailure(e.message));
+      }
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> swipeMovie(int movieId, bool isLike, String userId) async {
+    try {
+      await remoteDataSource.swipeMovie(movieId, isLike, userId);
       return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<Movie>>> searchMovies(String query) async {
+    try {
+      final remoteMovies = await remoteDataSource.searchMovies(query);
+      final movies = remoteMovies.map((model) => model.toEntity()).toList();
+      return Right(movies);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } on NetworkException catch (e) {

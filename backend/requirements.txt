@@ -14,5 +14,8 @@ redis==5.2.2
 # Environment
 python-dotenv==1.0.1
 
+# HTTP Client for TMDB API
+httpx==0.28.1
+
 # Vector operations (for future use)
 pgvector==0.3.8

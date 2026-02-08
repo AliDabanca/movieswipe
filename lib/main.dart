@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:movieswipe/core/config/env_config.dart';
 import 'package:movieswipe/core/di/injection_container.dart' as di;
-import 'package:movieswipe/features/movies/presentation/pages/swipe_page.dart';
+import 'package:movieswipe/core/providers/user_provider.dart';
+import 'package:movieswipe/features/users/presentation/pages/user_selection_page.dart';
+import 'package:movieswipe/features/navigation/main_navigation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,14 +27,25 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'MovieSwipe',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
+    return ChangeNotifierProvider(
+      create: (_) => UserProvider(),
+      child: MaterialApp(
+        title: 'MovieSwipe',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+          useMaterial3: true,
+        ),
+        home: Consumer<UserProvider>(
+          builder: (context, userProvider, _) {
+            // Show user selection if no user selected, otherwise show movies
+            if (userProvider.currentUserId == null) {
+              return const UserSelectionPage();
+            }
+            return const MainNavigation();
+          },
+        ),
       ),
-      home: const SwipePage(),
     );
   }
 }

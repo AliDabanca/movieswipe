@@ -16,9 +16,24 @@ class LoadMoviesEvent extends MoviesEvent {}
 class SwipeMovieEvent extends MoviesEvent {
   final int movieId;
   final bool isLike;
+  final String userId;
 
-  const SwipeMovieEvent({required this.movieId, required this.isLike});
+  const SwipeMovieEvent({
+    required this.movieId,
+    required this.isLike,
+    required this.userId,
+  });
 
   @override
-  List<Object> get props => [movieId, isLike];
+  List<Object> get props => [movieId, isLike, userId];
+}
+
+/// Event to search movies
+class SearchMoviesEvent extends MoviesEvent {
+  final String query;
+
+  const SearchMoviesEvent(this.query);
+
+  @override
+  List<Object> get props => [query];
 }

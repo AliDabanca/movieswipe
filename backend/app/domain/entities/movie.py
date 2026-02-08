@@ -10,6 +10,7 @@ class Movie:
     id: int
     name: str
     genre: str
+    poster_path: str | None = None
 
     def __eq__(self, other):
         if not isinstance(other, Movie):
