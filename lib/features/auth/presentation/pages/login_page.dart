@@ -13,13 +13,13 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -29,7 +29,7 @@ class _LoginPageState extends State<LoginPage> {
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     await authProvider.signIn(
-      _emailController.text.trim(),
+      _identifierController.text.trim(),
       _passwordController.text,
     );
   }
@@ -116,21 +116,18 @@ class _LoginPageState extends State<LoginPage> {
                         key: _formKey,
                         child: Column(
                           children: [
-                            // Email field
+                            // Email or Username field
                             TextFormField(
-                              controller: _emailController,
+                              controller: _identifierController,
                               keyboardType: TextInputType.emailAddress,
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration(
-                                label: 'Email',
-                                icon: Icons.email_outlined,
+                                label: 'Email veya Kullanıcı Adı',
+                                icon: Icons.person_outline,
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Email gerekli';
-                                }
-                                if (!value.contains('@')) {
-                                  return 'Geçerli bir email girin';
+                                  return 'Email veya Kullanıcı Adı gerekli';
                                 }
                                 return null;
                               },

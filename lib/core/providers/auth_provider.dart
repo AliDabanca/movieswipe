@@ -45,9 +45,12 @@ class AuthProvider extends ChangeNotifier {
       final previousUser = _user;
       _user = data.session?.user;
 
-      if (_user != null && previousUser?.id != _user?.id) {
-        _checkProfile();
-      } else if (_user == null) {
+      if (_user != null) {
+        if (previousUser?.id != _user?.id) {
+          _profileChecked = false;
+          _checkProfile();
+        }
+      } else {
         _username = null;
         _hasProfile = false;
         _profileChecked = true;
@@ -165,13 +168,38 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Sign in with email and password
-  Future<bool> signIn(String email, String password) async {
+  /// Sign in with email or username and password
+  Future<bool> signIn(String identifier, String password) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
+      String email = identifier.trim();
+
+      // If it's not an email, try to resolve as username
+      if (!email.contains('@')) {
+        final resolvedEmail = await _client.rpc(
+          'get_email_from_username',
+          params: {'p_username': email},
+        );
+
+        if (resolvedEmail == null) {
+          _errorMessage = 'Kullanıcı adı bulunamadı';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+        email = resolvedEmail as String;
+        // Optimistic update: we know they have a profile since we found the email via username
+        _username = identifier.trim();
+        _hasProfile = true;
+        _profileChecked = true;
+      } else {
+        // If logging in via email, ensure we re-check profile
+        _profileChecked = false;
+      }
+
       final response = await _client.auth.signInWithPassword(
         email: email,
         password: password,
@@ -184,7 +212,11 @@ class AuthProvider extends ChangeNotifier {
       // Profile check happens via auth state change listener
       return _user != null;
     } on AuthException catch (e) {
-      _errorMessage = e.message;
+      if (e.message.contains('Invalid login credentials')) {
+        _errorMessage = 'Hatalı e-posta/kullanıcı adı veya şifre';
+      } else {
+        _errorMessage = e.message;
+      }
       _isLoading = false;
       notifyListeners();
       return false;
