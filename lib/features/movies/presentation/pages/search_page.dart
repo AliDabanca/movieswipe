@@ -5,7 +5,7 @@ import 'package:movieswipe/features/movies/presentation/bloc/movies_bloc.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_event.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_state.dart';
 import 'package:provider/provider.dart';
-import 'package:movieswipe/core/providers/user_provider.dart';
+import 'package:movieswipe/core/providers/auth_provider.dart';
 import 'dart:async';
 
 class SearchPage extends StatefulWidget {
@@ -42,8 +42,8 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   Widget build(BuildContext context) {
-    final userProvider = Provider.of<UserProvider>(context);
-    final currentUserId = userProvider.currentUserId;
+    final authProvider = Provider.of<AuthProvider>(context);
+    final currentUserId = authProvider.currentUserId;
 
     return Scaffold(
       appBar: AppBar(

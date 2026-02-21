@@ -8,6 +8,8 @@ class MovieModel extends Movie {
     required super.genre,
     super.posterPath,
     super.releaseDate,
+    super.overview,
+    super.voteAverage,
   });
 
   /// Create from JSON
@@ -15,9 +17,11 @@ class MovieModel extends Movie {
     return MovieModel(
       id: json['id'] as int,
       name: json['name'] as String,
-      genre: json['genre'] as String? ?? 'General', // Handle optional genre
+      genre: json['genre'] as String? ?? 'General',
       posterPath: json['poster_path'] as String?,
       releaseDate: json['release_date'] as String?,
+      overview: json['overview'] as String?,
+      voteAverage: (json['vote_average'] as num?)?.toDouble(),
     );
   }
 
@@ -29,6 +33,8 @@ class MovieModel extends Movie {
       'genre': genre,
       'poster_path': posterPath,
       'release_date': releaseDate,
+      'overview': overview,
+      'vote_average': voteAverage,
     };
   }
 
@@ -40,6 +46,127 @@ class MovieModel extends Movie {
       genre: genre,
       posterPath: posterPath,
       releaseDate: releaseDate,
+      overview: overview,
+      voteAverage: voteAverage,
+    );
+  }
+}
+
+/// Detail model for the movie detail page
+class MovieDetailModel extends MovieModel {
+  final List<String> genres;
+  final String? backdropPath;
+  final String? overviewEn;
+  final int? runtime;
+  final String? tagline;
+  final String? director;
+  final List<String> cast;
+  final List<CastMemberModel> castDetails;
+  final int voteCount;
+  final List<MovieModel> similarMovies;
+
+  const MovieDetailModel({
+    required super.id,
+    required super.name,
+    required super.genre,
+    super.posterPath,
+    super.releaseDate,
+    super.overview,
+    super.voteAverage,
+    this.genres = const [],
+    this.backdropPath,
+    this.overviewEn,
+    this.runtime,
+    this.tagline,
+    this.director,
+    this.cast = const [],
+    this.castDetails = const [],
+    this.voteCount = 0,
+    this.similarMovies = const [],
+  });
+
+  /// Create from JSON
+  factory MovieDetailModel.fromJson(Map<String, dynamic> json) {
+    return MovieDetailModel(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      genre: json['genre'] as String? ?? 'General',
+      posterPath: json['poster_path'] as String?,
+      releaseDate: json['release_date'] as String?,
+      overview: json['overview'] as String?,
+      overviewEn: json['overview_en'] as String?,
+      voteAverage: (json['vote_average'] as num?)?.toDouble(),
+      voteCount: json['vote_count'] as int? ?? 0,
+      genres: (json['genres'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
+      backdropPath: json['backdrop_path'] as String?,
+      runtime: json['runtime'] as int?,
+      tagline: json['tagline'] as String?,
+      director: json['director'] as String?,
+      cast: (json['cast'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
+      castDetails: (json['cast_details'] as List<dynamic>?)
+              ?.map((e) => CastMemberModel.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      similarMovies: (json['similar_movies'] as List<dynamic>?)
+              ?.map((e) => MovieModel.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+    );
+  }
+
+  /// Convert to domain entity
+  MovieDetail toDetailEntity() {
+    return MovieDetail(
+      id: id,
+      name: name,
+      genre: genre,
+      posterPath: posterPath,
+      releaseDate: releaseDate,
+      overview: overview,
+      voteAverage: voteAverage,
+      genres: genres,
+      backdropPath: backdropPath,
+      overviewEn: overviewEn,
+      runtime: runtime,
+      tagline: tagline,
+      director: director,
+      cast: cast,
+      castDetails: castDetails
+          .map((c) => CastMember(
+                name: c.name,
+                character: c.character,
+                profilePath: c.profilePath,
+              ))
+          .toList(),
+      voteCount: voteCount,
+      similarMovies: similarMovies.map((m) => m.toEntity()).toList(),
+    );
+  }
+}
+
+/// Cast member model
+class CastMemberModel {
+  final String name;
+  final String character;
+  final String? profilePath;
+
+  const CastMemberModel({
+    required this.name,
+    this.character = '',
+    this.profilePath,
+  });
+
+  factory CastMemberModel.fromJson(Map<String, dynamic> json) {
+    return CastMemberModel(
+      name: json['name'] as String? ?? '',
+      character: json['character'] as String? ?? '',
+      profilePath: json['profile_path'] as String?,
     );
   }
 }

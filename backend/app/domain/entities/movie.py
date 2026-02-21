@@ -11,6 +11,9 @@ class Movie:
     name: str
     genre: str
     poster_path: str | None = None
+    overview: str | None = None
+    release_date: str | None = None
+    vote_average: float | None = None
 
     def __eq__(self, other):
         if not isinstance(other, Movie):

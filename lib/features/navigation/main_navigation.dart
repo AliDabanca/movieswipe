@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
-import 'package:movieswipe/core/providers/user_provider.dart';
+import 'package:movieswipe/core/providers/auth_provider.dart';
+import 'package:movieswipe/core/providers/liked_movies_provider.dart';
 import 'package:movieswipe/features/movies/presentation/pages/swipe_page.dart';
 import 'package:movieswipe/features/movies/presentation/pages/my_list_page.dart';
 import 'package:movieswipe/features/users/presentation/pages/profile_page.dart';
@@ -20,20 +21,24 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
-  int _previousIndex = 0;
-  final GlobalKey<MyListPageState> _myListKey = GlobalKey<MyListPageState>();
-  final GlobalKey<ProfilePageState> _profileKey = GlobalKey<ProfilePageState>();
 
-  late final List<Widget> _pages;
+  final List<Widget> _pages = const [
+    SwipePage(),
+    MyListPage(),
+    ProfilePage(),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _pages = [
-      const SwipePage(),
-      MyListPage(key: _myListKey),
-      ProfilePage(key: _profileKey),
-    ];
+    _loadInitialData();
+  }
+
+  void _loadInitialData() {
+    final userId = Provider.of<AuthProvider>(context, listen: false).currentUserId;
+    if (userId != null) {
+      Provider.of<LikedMoviesProvider>(context, listen: false).loadFromApi(userId);
+    }
   }
 
   @override
@@ -49,21 +54,8 @@ class _MainNavigationState extends State<MainNavigation> {
           selectedIndex: _currentIndex,
           onDestinationSelected: (index) {
             setState(() {
-              _previousIndex = _currentIndex;
               _currentIndex = index;
             });
-            
-            // Refresh My List when leaving Swipe page (index 0) to My List (index 1)
-            if (index == 1 && _previousIndex == 0) {
-              print('🔄 Refreshing My List after session...');
-              _myListKey.currentState?.refreshList();
-            }
-
-            // Refresh Profile when entering Profile page (index 2)
-            if (index == 2) {
-              print('🔄 Refreshing Profile stats...');
-              _profileKey.currentState?.loadUserStats();
-            }
           },
           destinations: const [
             NavigationDestination(

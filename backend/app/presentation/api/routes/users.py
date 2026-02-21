@@ -1,11 +1,9 @@
 """User management API routes."""
 
-from fastapi import APIRouter, status, HTTPException, Query
-from typing import List
-from uuid import uuid4
+from fastapi import APIRouter, Depends, status, HTTPException
 
 from app.services.recommendation_service import RecommendationService
-from app.core.errors import ServerError
+from app.core.auth import get_current_user_id
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -13,52 +11,11 @@ router = APIRouter(prefix="/users", tags=["users"])
 recommendation_service = RecommendationService()
 
 
-@router.get("/")
-async def get_users():
+@router.get("/me/profile")
+async def get_my_profile(user_id: str = Depends(get_current_user_id)):
     """
-    Get list of all users with basic statistics.
-    
-    Returns:
-        List of users with swipe counts and preferences
-    """
-    try:
-        # For now, we'll get distinct user_ids from swipes
-        # In production, you'd have a proper users table
-        users = recommendation_service.get_all_users()
-        return users
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch users: {str(e)}",
-        )
-
-
-@router.post("/")
-async def create_user():
-    """
-    Create a new user.
-    
-    Returns:
-        New user object with UUID
-    """
-    user_id = str(uuid4())
-    return {
-        "user_id": user_id,
-        "created": True,
-        "message": f"User {user_id} created successfully"
-    }
-
-
-@router.get("/{user_id}/profile")
-async def get_user_profile(user_id: str):
-    """
-    Get detailed user profile with preferences.
-    
-    Args:
-        user_id: User UUID
-        
-    Returns:
-        User statistics and genre preferences
+    Get the current user's profile with preferences.
+    User ID comes from JWT token.
     """
     try:
         stats = recommendation_service.get_user_stats(user_id)
@@ -70,16 +27,11 @@ async def get_user_profile(user_id: str):
         )
 
 
-@router.get("/{user_id}/liked-movies")
-async def get_liked_movies(user_id: str):
+@router.get("/me/liked-movies")
+async def get_my_liked_movies(user_id: str = Depends(get_current_user_id)):
     """
-    Get user's liked movies grouped by genre.
-    
-    Args:
-        user_id: User UUID
-        
-    Returns:
-        Movies grouped by genre {"Action": [...], "Drama": [...]}
+    Get the current user's liked movies grouped by genre.
+    User ID comes from JWT token.
     """
     try:
         movies = recommendation_service.get_liked_movies_by_genre(user_id)
@@ -91,55 +43,17 @@ async def get_liked_movies(user_id: str):
         )
 
 
-@router.get("/{user_id}/stats")
-async def get_detailed_stats(user_id: str):
+@router.get("/me/stats")
+async def get_my_stats(user_id: str = Depends(get_current_user_id)):
     """
     Get detailed user statistics.
-    
-    Args:
-        user_id: User UUID
-        
-    Returns:
-        Detailed user statistics
+    User ID comes from JWT token.
     """
     try:
-        # For now, use same as profile endpoint
-        # Can be extended with more detailed analytics later
         stats = recommendation_service.get_user_stats(user_id)
         return stats
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch user stats: {str(e)}",
-        )
-
-
-@router.get("/compare")
-async def compare_users(user_ids: str = Query(..., description="Comma-separated user IDs")):
-    """
-    Compare multiple user profiles.
-    
-    Args:
-        user_ids: Comma-separated list of user UUIDs
-        
-    Returns:
-        List of user profiles for comparison
-    """
-    try:
-        ids = [uid.strip() for uid in user_ids.split(",")]
-        profiles = []
-        
-        for user_id in ids:
-            try:
-                stats = recommendation_service.get_user_stats(user_id)
-                profiles.append(stats)
-            except Exception as e:
-                print(f"⚠️  Error getting profile for {user_id}: {e}")
-                continue
-        
-        return profiles
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to compare users: {str(e)}",
         )

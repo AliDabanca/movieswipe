@@ -56,6 +56,9 @@ dependencies:
   # Persistence
   shared_preferences: ^2.3.3
 
+  # Supabase
+  supabase_flutter: ^2.8.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

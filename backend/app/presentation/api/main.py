@@ -1,5 +1,8 @@
 """Main FastAPI application."""
 
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,12 +11,46 @@ from app.core.config import settings
 from app.core.errors import DomainException, NotFoundError, ValidationError
 from app.presentation.api.routes import movies, recommendations, users, sync, search
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+)
+logger = logging.getLogger("movieswipe")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup and shutdown events for the application."""
+    # === STARTUP ===
+    from app.services.scheduler_service import scheduler_service
+    
+    logger.info("🚀 MovieSwipe API starting up...")
+    
+    # Start the scheduler (periodic sync every 6 hours)
+    scheduler_service.start()
+    
+    # Run immediate startup sync in background (non-blocking)
+    import asyncio
+    asyncio.create_task(scheduler_service.run_startup_sync())
+    
+    logger.info("✅ Startup complete!")
+    
+    yield  # App is running
+    
+    # === SHUTDOWN ===
+    logger.info("🛑 Shutting down...")
+    scheduler_service.stop()
+    logger.info("👋 Goodbye!")
+
+
 # Create FastAPI app
 app = FastAPI(
     title="MovieSwipe API",
     description="Clean Architecture Backend for MovieSwipe Application",
     version="2.0.0",
     debug=settings.debug,
+    lifespan=lifespan,
 )
 
 # CORS middleware - Allow all origins for development

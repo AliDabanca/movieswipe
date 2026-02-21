@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start Backend",
+      "type": "shell",
+      "command": "python -m uvicorn app.presentation.api.main:app --reload --host 0.0.0.0 --port 8000",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*Uvicorn running.*$",
+          "endsPattern": "^.*Application startup complete.*$"
+        }
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "group": "movieswipe"
+      }
+    },
+    {
+      "label": "Stop Backend",
+      "type": "shell",
+      "command": "taskkill /f /im uvicorn.exe 2>nul & taskkill /f /im python.exe /fi \"WINDOWTITLE eq *uvicorn*\" 2>nul",
+      "presentation": {
+        "reveal": "silent"
+      }
+    }
+  ]
+}

@@ -1,11 +1,12 @@
 """Recommendation routes."""
 
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List
 
 from app.services.recommendation_service import RecommendationService
 from app.data.models.movie_model import MovieModel
 from app.core.errors import ServerError
+from app.core.auth import get_current_user_id
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 
@@ -15,18 +16,19 @@ recommendation_service = RecommendationService()
 
 @router.get("/", response_model=List[MovieModel])
 async def get_recommendations(
-    user_id: str = Query("00000000-0000-0000-0000-000000000001", description="User ID (UUID format)"),
+    user_id: str = Depends(get_current_user_id),
     limit: int = Query(50, ge=1, le=100, description="Number of recommendations")
 ):
     """
-    Get personalized movie recommendations for a user.
+    Get personalized movie recommendations for the authenticated user.
+    
+    User ID is extracted from JWT token automatically.
     
     Strategy:
     - Users with < 5 likes: Random/popular movies (cold start)
     - Users with 5+ likes: 70% personalized + 30% discovery
     
     Args:
-        user_id: User ID
         limit: Number of recommendations to return
         
     Returns:
@@ -44,14 +46,12 @@ async def get_recommendations(
 
 @router.get("/debug/stats")
 async def get_user_stats(
-    user_id: str = Query("00000000-0000-0000-0000-000000000001", description="User ID (UUID format)")
+    user_id: str = Depends(get_current_user_id),
 ):
     """
     Get user statistics and preferences for debugging.
+    User ID is extracted from JWT token automatically.
     
-    Args:
-        user_id: User ID
-        
     Returns:
         User statistics including genre preferences
     """

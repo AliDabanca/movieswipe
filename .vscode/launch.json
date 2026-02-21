@@ -1,0 +1,24 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "MovieSwipe (Full Stack)",
+            "type": "dart",
+            "request": "launch",
+            "program": "lib/main.dart",
+            "preLaunchTask": "Start Backend",
+            "args": [
+                "--dart-define=FLAVOR=dev"
+            ]
+        },
+        {
+            "name": "MovieSwipe (Flutter Only)",
+            "type": "dart",
+            "request": "launch",
+            "program": "lib/main.dart",
+            "args": [
+                "--dart-define=FLAVOR=dev"
+            ]
+        }
+    ]
+}

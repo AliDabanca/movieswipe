@@ -8,6 +8,7 @@ abstract class MovieRemoteDataSource {
   Future<List<MovieModel>> getRecommendedMovies(); // NEW: Personalized recommendations
   Future<List<MovieModel>> searchMovies(String query);
   Future<void> swipeMovie(int movieId, bool isLike, String userId);
+  Future<MovieDetailModel> getMovieDetails(int movieId);
 }
 
 /// Implementation of remote data source
@@ -61,7 +62,7 @@ class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
         '/movies/$movieId/swipe',
         body: {
           'isLike': isLike,
-          'userId': userId,
+          // userId now comes from JWT token automatically via ApiClient headers
         },
       );
     } catch (e) {
@@ -86,6 +87,21 @@ class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
     } catch (e) {
       if (e is ServerException) rethrow;
       throw ServerException(message: 'Failed to search movies: $e');
+    }
+  }
+  @override
+  Future<MovieDetailModel> getMovieDetails(int movieId) async {
+    try {
+      final response = await apiClient.get('/movies/$movieId/details');
+
+      if (response is! Map<String, dynamic>) {
+        throw ServerException(message: 'Invalid response format');
+      }
+
+      return MovieDetailModel.fromJson(response);
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException(message: 'Failed to fetch movie details: $e');
     }
   }
 }

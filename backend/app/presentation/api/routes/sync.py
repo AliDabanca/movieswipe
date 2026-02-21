@@ -11,17 +11,17 @@ router = APIRouter(prefix="/movies/sync", tags=["sync"])
 @router.post("/")
 async def trigger_sync(
     categories: List[str] = Query(
-        default=["popular", "now_playing", "upcoming"],
+        default=["popular", "now_playing", "upcoming", "top_rated", "trending"],
         description="Categories to sync"
     ),
-    pages: int = Query(default=2, ge=1, le=10, description="Pages per category")
+    pages: int = Query(default=3, ge=1, le=20, description="Pages per category")
 ):
     """
     Manually trigger movie sync from TMDB.
     
     Args:
-        categories: List of categories (popular, now_playing, upcoming)
-        pages: Number of pages to fetch per category (1-10)
+        categories: List of categories (popular, now_playing, upcoming, top_rated, trending)
+        pages: Number of pages to fetch per category (1-20)
         
     Returns:
         Sync statistics
@@ -58,4 +58,22 @@ async def get_sync_status():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get status: {str(e)}",
+        )
+
+
+@router.get("/scheduler")
+async def get_scheduler_status():
+    """
+    Get scheduler status: next sync time, last sync results.
+    
+    Returns:
+        Scheduler info
+    """
+    try:
+        from app.services.scheduler_service import scheduler_service
+        return scheduler_service.get_status()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get scheduler status: {str(e)}",
         )

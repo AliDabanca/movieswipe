@@ -197,3 +197,163 @@ class SupabaseDataSource:
             return [swipe["movie_id"] for swipe in response.data]
         except Exception as e:
             raise ServerError(f"Supabase swiped movies fetch error: {str(e)}")
+
+    def get_unseen_movies(self, user_id: str, limit: int = 200) -> List[Dict[str, Any]]:
+        """
+        Get movies the user hasn't swiped yet.
+        Uses Supabase RPC if available, falls back to Python-side filtering.
+        
+        Args:
+            user_id: User ID
+            limit: Maximum number of movies to return
+            
+        Returns:
+            List of unseen movie dictionaries
+        """
+        try:
+            # Try Supabase RPC first (fastest)
+            response = self.client.rpc(
+                "get_unseen_movies",
+                {"p_user_id": user_id, "p_limit": limit}
+            ).execute()
+            return response.data
+        except Exception as rpc_error:
+            # Fallback: Python-side filtering
+            print(f"⚠️  RPC fallback (get_unseen_movies): {rpc_error}")
+            try:
+                all_movies = self.get_movies(limit=10000)
+                swiped_ids = set(self.get_user_swiped_movie_ids(user_id))
+                unseen = [m for m in all_movies if m["id"] not in swiped_ids]
+                # Sort by vote_average descending
+                unseen.sort(key=lambda m: m.get("vote_average") or 0, reverse=True)
+                return unseen[:limit]
+            except Exception as e:
+                raise ServerError(f"Failed to get unseen movies: {str(e)}")
+
+    def get_user_genre_stats(self, user_id: str) -> List[Dict[str, Any]]:
+        """
+        Get user's genre-level like/pass statistics.
+        Uses Supabase RPC if available, falls back to Python-side computation.
+        
+        Args:
+            user_id: User ID
+            
+        Returns:
+            List of dicts with genre, like_count, pass_count, total_count
+        """
+        try:
+            # Try Supabase RPC first
+            response = self.client.rpc(
+                "get_user_genre_stats",
+                {"p_user_id": user_id}
+            ).execute()
+            return response.data
+        except Exception as rpc_error:
+            # Fallback: Python-side computation
+            print(f"⚠️  RPC fallback (get_user_genre_stats): {rpc_error}")
+            try:
+                swipes = self.get_user_swipes(user_id, limit=10000)
+                if not swipes:
+                    return []
+                
+                # Get movie details for genres
+                movie_ids = [s["movie_id"] for s in swipes]
+                movies = self.get_movies_by_ids(movie_ids)
+                movie_map = {m["id"]: m for m in movies}
+                
+                # Compute genre stats
+                genre_stats = {}
+                for swipe in swipes:
+                    movie = movie_map.get(swipe["movie_id"])
+                    if not movie:
+                        continue
+                    genre = movie.get("genre", "General")
+                    if genre not in genre_stats:
+                        genre_stats[genre] = {"genre": genre, "like_count": 0, "pass_count": 0, "total_count": 0}
+                    genre_stats[genre]["total_count"] += 1
+                    if swipe.get("is_like"):
+                        genre_stats[genre]["like_count"] += 1
+                    else:
+                        genre_stats[genre]["pass_count"] += 1
+                
+                return list(genre_stats.values())
+            except Exception as e:
+                raise ServerError(f"Failed to get genre stats: {str(e)}")
+
+    def get_similar_movies(self, movie_id: int, limit: int = 3) -> List[Dict[str, Any]]:
+        """Get similar movies using pgvector cosine similarity.
+        
+        Args:
+            movie_id: Source movie ID
+            limit: Number of similar movies to return
+            
+        Returns:
+            List of similar movie dicts ordered by similarity
+        """
+        try:
+            # First get the source movie's embedding
+            movie = self.client.table("movies").select("embedding").eq("id", movie_id).single().execute()
+            
+            if not movie.data or not movie.data.get("embedding"):
+                # Fallback: return movies with same genre
+                source = self.client.table("movies").select("genre").eq("id", movie_id).single().execute()
+                if source.data:
+                    genre = source.data.get("genre", "")
+                    response = self.client.table("movies") \
+                        .select("id, name, genre, poster_path, overview, release_date, vote_average") \
+                        .eq("genre", genre) \
+                        .neq("id", movie_id) \
+                        .order("vote_average", desc=True) \
+                        .limit(limit) \
+                        .execute()
+                    return response.data if response.data else []
+                return []
+            
+            # Use RPC to find similar movies via vector search
+            embedding = movie.data["embedding"]
+            response = self.client.rpc("match_movies", {
+                "query_embedding": embedding,
+                "match_count": limit,
+                "exclude_id": movie_id,
+            }).execute()
+            
+            return response.data if response.data else []
+            
+        except Exception as e:
+            print(f"⚠️  Vector search failed, using genre fallback: {e}")
+            # Fallback: same genre, highest rated
+            try:
+                source = self.client.table("movies").select("genre").eq("id", movie_id).single().execute()
+                if source.data:
+                    genre = source.data.get("genre", "")
+                    response = self.client.table("movies") \
+                        .select("id, name, genre, poster_path, overview, release_date, vote_average") \
+                        .eq("genre", genre) \
+                        .neq("id", movie_id) \
+                        .order("vote_average", desc=True) \
+                        .limit(limit) \
+                        .execute()
+                    return response.data if response.data else []
+            except Exception:
+                pass
+            return []
+
+    def update_movie_embedding(self, movie_id: int, embedding: list) -> bool:
+        """Update a movie's embedding vector.
+        
+        Args:
+            movie_id: Movie ID
+            embedding: List of floats (384-dim vector)
+            
+        Returns:
+            True if successful
+        """
+        try:
+            self.client.table("movies") \
+                .update({"embedding": embedding}) \
+                .eq("id", movie_id) \
+                .execute()
+            return True
+        except Exception as e:
+            print(f"⚠️  Failed to update embedding for movie {movie_id}: {e}")
+            return False

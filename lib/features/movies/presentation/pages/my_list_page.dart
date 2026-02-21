@@ -1,135 +1,89 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:movieswipe/core/providers/user_provider.dart';
-import 'package:movieswipe/core/network/api_client.dart';
+import 'package:movieswipe/core/providers/liked_movies_provider.dart';
 
 /// My List page showing liked movies grouped by genre
-class MyListPage extends StatefulWidget {
+class MyListPage extends StatelessWidget {
   const MyListPage({super.key});
 
   @override
-  State<MyListPage> createState() => MyListPageState();
+  Widget build(BuildContext context) {
+    return Consumer<LikedMoviesProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading && !provider.isLoaded) {
+          return Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF6366F1),
+                  Color(0xFF8B5CF6),
+                  Color(0xFFEC4899),
+                ],
+              ),
+            ),
+            child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+          );
+        }
+
+        if (provider.moviesByGenre.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.favorite_border,
+                  size: 100,
+                  color: Colors.grey[400],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No liked movies yet!',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Start swiping to build your collection',
+                  style: TextStyle(color: Colors.grey[500]),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return _MyListContent(moviesByGenre: provider.moviesByGenre);
+      },
+    );
+  }
 }
 
-class MyListPageState extends State<MyListPage> {
-  Map<String, List<dynamic>> _moviesByGenre = {};
-  bool _loading = true;
-  bool _isRefreshing = false;
-  DateTime? _lastRefresh;
-  String? _selectedGenre; // null = "All"
+/// Stateful content widget for genre filtering
+class _MyListContent extends StatefulWidget {
+  final Map<String, List<Map<String, dynamic>>> moviesByGenre;
+
+  const _MyListContent({required this.moviesByGenre});
 
   @override
-  void initState() {
-    super.initState();
-    _loadLikedMovies();
-  }
+  State<_MyListContent> createState() => _MyListContentState();
+}
 
-  /// Public method to refresh the list (called from parent)
-  void refreshList() {
-    // Only refresh if not already refreshing and if last refresh was more than 2 seconds ago
-    final now = DateTime.now();
-    if (_isRefreshing) {
-      print('⏭️  Already refreshing, skipping...');
-      return;
-    }
-    if (_lastRefresh != null && now.difference(_lastRefresh!) < Duration(seconds: 2)) {
-      print('⏭️  Refreshed recently, skipping...');
-      return;
-    }
-    _loadLikedMovies();
-  }
+class _MyListContentState extends State<_MyListContent> {
+  String? _selectedGenre;
 
-  Future<void> _loadLikedMovies() async {
-    final userId = Provider.of<UserProvider>(context, listen: false).currentUserId;
-    
-    if (userId == null || _isRefreshing) return;
-
-    setState(() {
-      _loading = true;
-      _isRefreshing = true;
-    });
-
-    try {
-      final movies = await ApiClient(client: null).get('/users/$userId/liked-movies');
-      if (mounted) {
-        setState(() {
-          _moviesByGenre = Map<String, List<dynamic>>.from(
-            (movies as Map).map((key, value) => MapEntry(key as String, value as List))
-          );
-          _loading = false;
-          _isRefreshing = false;
-          _lastRefresh = DateTime.now();
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _isRefreshing = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load movies: $e')),
-        );
-      }
-    }
-  }
-
-  /// Get filtered genres based on selection
-  Map<String, List<dynamic>> get _filteredMovies {
+  Map<String, List<Map<String, dynamic>>> get _filteredMovies {
     if (_selectedGenre == null) {
-      return _moviesByGenre;
+      return widget.moviesByGenre;
     }
-    return {_selectedGenre!: _moviesByGenre[_selectedGenre] ?? []};
+    return {_selectedGenre!: widget.moviesByGenre[_selectedGenre] ?? []};
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF6366F1), // Indigo
-              Color(0xFF8B5CF6), // Purple
-              Color(0xFFEC4899), // Pink
-            ],
-          ),
-        ),
-        child: const Center(child: CircularProgressIndicator(color: Colors.white)),
-      );
-    }
-
-    if (_moviesByGenre.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.favorite_border,
-              size: 100,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No liked movies yet!',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Start swiping to build your collection',
-              style: TextStyle(color: Colors.grey[500]),
-            ),
-          ],
-        ),
-      );
-    }
-
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -137,9 +91,9 @@ class MyListPageState extends State<MyListPage> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF6366F1), // Indigo
-              Color(0xFF8B5CF6), // Purple  
-              Color(0xFFEC4899), // Pink
+              Color(0xFF6366F1),
+              Color(0xFF8B5CF6),
+              Color(0xFFEC4899),
             ],
           ),
         ),
@@ -173,7 +127,7 @@ class MyListPageState extends State<MyListPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   children: [
                     _buildGenreChip('All', null),
-                    ..._moviesByGenre.keys.map((genre) => _buildGenreChip(genre, genre)),
+                    ...widget.moviesByGenre.keys.map((genre) => _buildGenreChip(genre, genre)),
                   ],
                 ),
               ),

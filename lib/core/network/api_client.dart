@@ -1,26 +1,34 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:movieswipe/core/config/env_config.dart';
 import 'package:movieswipe/core/errors/exceptions.dart';
 
-/// HTTP API client wrapper
+/// HTTP API client wrapper with Supabase JWT auth
 class ApiClient {
   final http.Client _client;
 
   ApiClient({http.Client? client}) : _client = client ?? http.Client();
 
+  /// Get auth headers with Supabase JWT token
+  Map<String, String> get _headers {
+    final session = Supabase.instance.client.auth.currentSession;
+    return {
+      'Content-Type': 'application/json',
+      if (session != null) 'Authorization': 'Bearer ${session.accessToken}',
+    };
+  }
+
   /// GET request
   Future<dynamic> get(String endpoint) async {
     try {
       final url = Uri.parse('${EnvConfig.baseUrl}$endpoint');
-      print('🌐 REQUESTING TO: $url'); // Debug print
       final response = await _client
-          .get(url)
+          .get(url, headers: _headers)
           .timeout(Duration(milliseconds: EnvConfig.apiTimeout));
 
       return _handleResponse(response);
     } catch (e) {
-      print('❌ REQUEST FAILED: $e'); // Debug print
       throw NetworkException(message: 'Failed to connect to server: $e');
     }
   }
@@ -32,19 +40,16 @@ class ApiClient {
   }) async {
     try {
       final url = Uri.parse('${EnvConfig.baseUrl}$endpoint');
-      print('🌐 POSTING TO: $url'); // Debug print
-      print('📦 BODY: $body'); // Debug print
       final response = await _client
           .post(
             url,
-            headers: {'Content-Type': 'application/json'},
+            headers: _headers,
             body: body != null ? jsonEncode(body) : null,
           )
           .timeout(Duration(milliseconds: EnvConfig.apiTimeout));
 
       return _handleResponse(response);
     } catch (e) {
-      print('❌ POST FAILED: $e'); // Debug print
       throw NetworkException(message: 'Failed to connect to server: $e');
     }
   }
