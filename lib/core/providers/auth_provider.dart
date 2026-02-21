@@ -6,6 +6,9 @@ class AuthProvider extends ChangeNotifier {
   User? _user;
   bool _isLoading = true;
   String? _errorMessage;
+  String? _username;
+  bool _hasProfile = false;
+  bool _profileChecked = false;
 
   AuthProvider() {
     _init();
@@ -18,6 +21,9 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   String get userEmail => _user?.email ?? '';
+  String? get username => _username;
+  bool get hasProfile => _hasProfile;
+  bool get profileChecked => _profileChecked;
 
   SupabaseClient get _client => Supabase.instance.client;
 
@@ -25,13 +31,107 @@ class AuthProvider extends ChangeNotifier {
     // Check current session
     _user = _client.auth.currentUser;
     _isLoading = false;
+
+    if (_user != null) {
+      _checkProfile();
+    } else {
+      _profileChecked = true;
+    }
+
     notifyListeners();
 
     // Listen to auth state changes
     _client.auth.onAuthStateChange.listen((data) {
+      final previousUser = _user;
       _user = data.session?.user;
+
+      if (_user != null && previousUser?.id != _user?.id) {
+        _checkProfile();
+      } else if (_user == null) {
+        _username = null;
+        _hasProfile = false;
+        _profileChecked = true;
+      }
+
       notifyListeners();
     });
+  }
+
+  /// Check if user has a profile with username
+  Future<void> _checkProfile() async {
+    try {
+      final response = await _client
+          .from('profiles')
+          .select('username')
+          .eq('id', _user!.id)
+          .maybeSingle();
+
+      if (response != null) {
+        _username = response['username'] as String?;
+        _hasProfile = _username != null;
+      } else {
+        _hasProfile = false;
+        _username = null;
+      }
+    } catch (e) {
+      debugPrint('Profile check error: $e');
+      _hasProfile = false;
+      _username = null;
+    }
+    _profileChecked = true;
+    notifyListeners();
+  }
+
+  /// Check if username is available (for real-time validation)
+  Future<bool> isUsernameAvailable(String username) async {
+    try {
+      final response = await _client.rpc(
+        'check_username_available',
+        params: {'p_username': username},
+      );
+      return response as bool? ?? false;
+    } catch (e) {
+      debugPrint('Username check error: $e');
+      return false;
+    }
+  }
+
+  /// Set username for current user (creates profile)
+  Future<bool> setUsername(String username) async {
+    if (_user == null) return false;
+
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _client.from('profiles').insert({
+        'id': _user!.id,
+        'username': username,
+      });
+
+      _username = username;
+      _hasProfile = true;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } on PostgrestException catch (e) {
+      if (e.code == '23505') {
+        _errorMessage = 'Bu kullanıcı adı zaten alınmış';
+      } else if (e.code == '23514') {
+        _errorMessage = 'Kullanıcı adı sadece harf ve rakam içerebilir (3-20 karakter)';
+      } else {
+        _errorMessage = 'Profil oluşturulamadı: ${e.message}';
+      }
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Bir hata oluştu: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
   /// Sign up with email and password
@@ -47,6 +147,8 @@ class AuthProvider extends ChangeNotifier {
       );
 
       _user = response.user;
+      _hasProfile = false;
+      _profileChecked = true;
       _isLoading = false;
       notifyListeners();
       return _user != null;
@@ -78,6 +180,8 @@ class AuthProvider extends ChangeNotifier {
       _user = response.user;
       _isLoading = false;
       notifyListeners();
+
+      // Profile check happens via auth state change listener
       return _user != null;
     } on AuthException catch (e) {
       _errorMessage = e.message;
@@ -96,6 +200,8 @@ class AuthProvider extends ChangeNotifier {
   Future<void> signOut() async {
     await _client.auth.signOut();
     _user = null;
+    _username = null;
+    _hasProfile = false;
     notifyListeners();
   }
 

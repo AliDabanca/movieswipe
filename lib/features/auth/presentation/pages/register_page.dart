@@ -29,15 +29,12 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!_formKey.currentState!.validate()) return;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final success = await authProvider.signUp(
+    await authProvider.signUp(
       _emailController.text.trim(),
       _passwordController.text,
     );
-
-    if (success && mounted) {
-      // Go back to login or auto-navigate to main
-      Navigator.of(context).pop();
-    }
+    // Navigation is handled by main.dart Consumer<AuthProvider>
+    // After signUp, auth state changes → main.dart shows UsernamePage
   }
 
   @override

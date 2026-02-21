@@ -6,6 +6,7 @@ import 'package:movieswipe/core/di/injection_container.dart' as di;
 import 'package:movieswipe/core/providers/auth_provider.dart';
 import 'package:movieswipe/core/providers/liked_movies_provider.dart';
 import 'package:movieswipe/features/auth/presentation/pages/login_page.dart';
+import 'package:movieswipe/features/auth/presentation/pages/username_page.dart';
 import 'package:movieswipe/features/navigation/main_navigation.dart';
 
 void main() async {
@@ -51,14 +52,21 @@ class MyApp extends StatelessWidget {
         ),
         home: Consumer<AuthProvider>(
           builder: (context, auth, _) {
-            if (auth.isLoading) {
+            // Still loading auth state
+            if (auth.isLoading || (auth.isAuthenticated && !auth.profileChecked)) {
               return const Scaffold(
                 body: Center(child: CircularProgressIndicator()),
               );
             }
-            if (auth.isAuthenticated) {
+            // Authenticated but no username yet → username selection
+            if (auth.isAuthenticated && !auth.hasProfile) {
+              return const UsernamePage();
+            }
+            // Authenticated with profile → main app
+            if (auth.isAuthenticated && auth.hasProfile) {
               return const MainNavigation();
             }
+            // Not authenticated → login
             return const LoginPage();
           },
         ),

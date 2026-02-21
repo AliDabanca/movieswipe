@@ -35,10 +35,12 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   void _loadInitialData() {
-    final userId = Provider.of<AuthProvider>(context, listen: false).currentUserId;
-    if (userId != null) {
-      Provider.of<LikedMoviesProvider>(context, listen: false).loadFromApi(userId);
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userId = Provider.of<AuthProvider>(context, listen: false).currentUserId;
+      if (userId != null) {
+        Provider.of<LikedMoviesProvider>(context, listen: false).loadFromApi(userId);
+      }
+    });
   }
 
   @override
