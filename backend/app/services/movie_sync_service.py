@@ -4,6 +4,7 @@ from typing import Dict, List
 from app.data.services.tmdb_service import TMDBService
 from app.data.datasources.supabase_datasource import SupabaseDataSource
 from app.data.repositories.movie_repository_impl import MovieRepositoryImpl
+from app.core.logger import logger
 
 
 class MovieSyncService:
@@ -16,110 +17,141 @@ class MovieSyncService:
     
     async def sync_movies(self, categories: List[str] = None, pages_per_category: int = 3) -> Dict:
         """
-        Sync movies from TMDB to database.
-        
-        Args:
-            categories: List of categories to sync
-            pages_per_category: Number of pages to fetch per category
-            
-        Returns:
-            Sync statistics
+        Sync movies from TMDB to database in parallel with rate limiting.
         """
+        import asyncio
         if categories is None:
             categories = ["popular", "now_playing", "upcoming", "top_rated", "trending"]
+        
+        semaphore = asyncio.Semaphore(10)
+        
+        async def sync_with_semaphore(cat):
+            async with semaphore:
+                return await self._sync_category(cat, pages_per_category)
+
+        logger.info(f"Starting parallel sync for categories: {', '.join(categories)}...")
+        tasks = [sync_with_semaphore(cat) for cat in categories]
+        results = await asyncio.gather(*tasks)
         
         stats = {
             "total_fetched": 0,
             "new_movies": 0,
             "existing_movies": 0,
+            "embeddings_generated": 0,
             "errors": 0,
             "categories": {}
         }
         
-        for category in categories:
-            print(f"\n📡 Syncing {category} movies...")
-            category_stats = await self._sync_category(category, pages_per_category)
+        for category, cat_stats in zip(categories, results):
+            stats["total_fetched"] += cat_stats["fetched"]
+            stats["new_movies"] += cat_stats["new"]
+            stats["existing_movies"] += cat_stats["existing"]
+            stats["embeddings_generated"] += cat_stats.get("embeddings", 0)
+            stats["errors"] += cat_stats["errors"]
+            stats["categories"][category] = cat_stats
             
-            stats["total_fetched"] += category_stats["fetched"]
-            stats["new_movies"] += category_stats["new"]
-            stats["existing_movies"] += category_stats["existing"]
-            stats["errors"] += category_stats["errors"]
-            stats["categories"][category] = category_stats
-            
-            print(f"✅ {category}: {category_stats['new']} new, {category_stats['existing']} existing")
-        
-        print(f"\n🎬 SYNC COMPLETE: {stats['new_movies']} new movies added!")
+        logger.info(
+            f"SYNC COMPLETE: {stats['new_movies']} new movies added, "
+            f"{stats['embeddings_generated']} embeddings generated!"
+        )
         return stats
     
     async def _sync_category(self, category: str, pages: int) -> Dict:
-        """Sync a specific category of movies."""
-        stats = {"fetched": 0, "new": 0, "existing": 0, "errors": 0}
+        """Sync a specific category of movies in parallel pages."""
+        import asyncio
+        stats = {"fetched": 0, "new": 0, "existing": 0, "embeddings": 0, "errors": 0}
         
-        for page in range(1, pages + 1):
+        async def sync_page(p):
             try:
-                # Fetch movies from TMDB
-                movies = await self._fetch_category(category, page)
-                if movies is None:
-                    continue
-                
-                stats["fetched"] += len(movies)
-                
-                # Prepare batch for upsert
-                movies_to_save = []
-                for tmdb_movie in movies:
-                    try:
-                        # Filter out unwanted languages (Hindi, Chinese, Japanese, Korean)
-                        original_language = tmdb_movie.get("original_language", "")
-                        if original_language in ["hi", "zh", "ja", "ko", "cn", "tw"]:
-                            continue
-                        
-                        movie_dict = {
-                            "id": tmdb_movie["id"],
-                            "name": tmdb_movie.get("title", tmdb_movie.get("name", "Unknown")),
-                            "genre": self.repo._extract_genre(tmdb_movie),
-                            "poster_path": tmdb_movie.get("poster_path"),
-                            "overview": tmdb_movie.get("overview"),
-                            "release_date": tmdb_movie.get("release_date"),
-                            "vote_average": tmdb_movie.get("vote_average", 0),
-                        }
-                        movies_to_save.append(movie_dict)
-                    
-                    except Exception as e:
-                        stats["errors"] += 1
-                        print(f"⚠️  Error processing movie {tmdb_movie.get('id')}: {e}")
-                
-                # Batch upsert for better performance
-                if movies_to_save:
-                    try:
-                        # Check which exist already
-                        existing_ids = set()
-                        try:
-                            movie_ids = [m["id"] for m in movies_to_save]
-                            existing_movies = self.supabase_ds.get_movies_by_ids(movie_ids)
-                            existing_ids = {m["id"] for m in existing_movies}
-                        except Exception:
-                            pass
-                        
-                        new_movies = [m for m in movies_to_save if m["id"] not in existing_ids]
-                        stats["existing"] += len(movies_to_save) - len(new_movies)
-                        
-                        if new_movies:
-                            self.supabase_ds.save_movies_batch(new_movies)
-                            stats["new"] += len(new_movies)
-                    except Exception as e:
-                        # Fallback: save one by one
-                        for movie_dict in movies_to_save:
-                            try:
-                                self.supabase_ds.save_movie(movie_dict)
-                                stats["new"] += 1
-                            except Exception:
-                                stats["existing"] += 1
-                        
+                movies = await self._fetch_category(category, p)
+                return movies if movies else []
             except Exception as e:
-                print(f"❌ Error fetching {category} page {page}: {e}")
-                stats["errors"] += 1
+                logger.error(f"Error fetching {category} page {p}: {e}", exc_info=True)
+                return []
+
+        tasks = [sync_page(p) for p in range(1, pages + 1)]
+        pages_results = await asyncio.gather(*tasks)
         
+        for movies in pages_results:
+            if not movies:
+                continue
+                
+            stats["fetched"] += len(movies)
+            movies_to_save = []
+            
+            for tmdb_movie in movies:
+                try:
+                    original_language = tmdb_movie.get("original_language", "")
+                    if original_language in ["hi", "zh", "ja", "ko", "cn", "tw"]:
+                        continue
+                    
+                    movie_dict = {
+                        "id": tmdb_movie["id"],
+                        "name": tmdb_movie.get("title", tmdb_movie.get("name", "Unknown")),
+                        "genre": self.repo._extract_genre(tmdb_movie),
+                        "poster_path": tmdb_movie.get("poster_path"),
+                        "overview": tmdb_movie.get("overview"),
+                        "release_date": tmdb_movie.get("release_date"),
+                        "vote_average": tmdb_movie.get("vote_average", 0),
+                    }
+                    movies_to_save.append(movie_dict)
+                except Exception as e:
+                    stats["errors"] += 1
+                    logger.warning(f"Error processing movie {tmdb_movie.get('id')}: {e}")
+            
+            if movies_to_save:
+                try:
+                    movie_ids = [m["id"] for m in movies_to_save]
+                    existing_movies = self.supabase_ds.get_movies_by_ids(movie_ids)
+                    existing_ids = {m["id"] for m in existing_movies}
+                    
+                    new_movies = [m for m in movies_to_save if m["id"] not in existing_ids]
+                    stats["existing"] += len(movies_to_save) - len(new_movies)
+                    
+                    if new_movies:
+                        self.supabase_ds.save_movies_batch(new_movies)
+                        stats["new"] += len(new_movies)
+                        
+                        # Generate embeddings for newly saved movies
+                        stats["embeddings"] += await self._generate_embeddings_for_movies(new_movies)
+                except Exception:
+                    # Fallback: save one by one
+                    for movie_dict in movies_to_save:
+                        try:
+                            self.supabase_ds.save_movie(movie_dict)
+                            stats["new"] += 1
+                            stats["embeddings"] += await self._generate_embeddings_for_movies([movie_dict])
+                        except Exception:
+                            stats["existing"] += 1
+                            
         return stats
+
+    async def _generate_embeddings_for_movies(self, movies: List[Dict]) -> int:
+        """Generate and store embeddings for a list of movie dicts.
+
+        Runs in a thread pool to avoid blocking the async event loop,
+        since sentence-transformers model.encode() is CPU-bound.
+
+        Returns the number of successfully embedded movies.
+        """
+        import asyncio
+
+        def _sync_generate():
+            try:
+                from app.services.embedding_service import embedding_service
+
+                embeddings = embedding_service.embed_movies(movies)
+                success = 0
+                for movie, embedding in zip(movies, embeddings):
+                    if self.supabase_ds.update_movie_embedding(movie["id"], embedding):
+                        success += 1
+                logger.info(f"Generated embeddings for {success}/{len(movies)} movies")
+                return success
+            except Exception as e:
+                logger.error(f"Embedding generation failed: {e}", exc_info=True)
+                return 0
+
+        return await asyncio.to_thread(_sync_generate)
     
     async def _fetch_category(self, category: str, page: int):
         """Fetch movies from a specific TMDB category."""
@@ -133,7 +165,7 @@ class MovieSyncService:
         
         fetch_func = fetch_map.get(category)
         if fetch_func is None:
-            print(f"⚠️  Unknown category: {category}")
+            logger.warning(f"Unknown category: {category}")
             return None
         
         return await fetch_func(page)

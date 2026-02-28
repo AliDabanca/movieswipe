@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:movieswipe/core/errors/exceptions.dart';
 import 'package:movieswipe/features/movies/domain/usecases/get_recommended_movies.dart';
 import 'package:movieswipe/features/movies/domain/usecases/swipe_movie.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_event.dart';
@@ -28,12 +29,16 @@ class MoviesBloc extends Bloc<MoviesEvent, MoviesState> {
   ) async {
     emit(MoviesLoading());
 
-    final result = await getRecommendedMovies();
+    try {
+      final result = await getRecommendedMovies();
 
-    result.fold(
-      (failure) => emit(MoviesError(message: failure.message)),
-      (movies) => emit(MoviesLoaded(movies: movies)),
-    );
+      result.fold(
+        (failure) => emit(MoviesError(message: failure.message)),
+        (movies) => emit(MoviesLoaded(movies: movies)),
+      );
+    } on EndOfContentException catch (e) {
+      emit(MoviesEndOfContent(message: e.message));
+    }
   }
 
   Future<void> _onSearchMovies(

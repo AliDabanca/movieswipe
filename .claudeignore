@@ -1,0 +1,37 @@
+# Version Control
+.git/
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.iml
+
+# Flutter / Dart (Native klasörleri genelde kod yazarken gerekmez)
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+android/
+ios/
+linux/
+macos/
+windows/
+web/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.log
+
+# Secrets & Env (Güvenlik ve gereksizlik için)
+.env
+.env.*
+!.env.example
+
+# OS Files
+.DS_Store
+desktop.ini

@@ -151,11 +151,11 @@ class MovieScorer:
     def __init__(self, profile: UserProfile):
         self.profile = profile
     
-    def score_movie(self, movie: Movie) -> float:
+    def score_movie(self, movie: Movie, now: datetime) -> float:
         """Calculate composite score for a single movie."""
         genre_score = self.profile.get_genre_score(movie.genre)
         quality_score = self._quality_score(movie)
-        freshness_score = self._freshness_score(movie)
+        freshness_score = self._freshness_score(movie, now)
         
         return (
             genre_score * self.GENRE_WEIGHT +
@@ -165,7 +165,8 @@ class MovieScorer:
     
     def score_movies(self, movies: List[Movie]) -> List[Tuple[Movie, float]]:
         """Score and sort a list of movies."""
-        scored = [(m, self.score_movie(m)) for m in movies]
+        now = datetime.now()
+        scored = [(m, self.score_movie(m, now)) for m in movies]
         scored.sort(key=lambda x: x[1], reverse=True)
         return scored
     
@@ -176,14 +177,19 @@ class MovieScorer:
         return min(1.0, max(0.0, vote / 10.0))
     
     @staticmethod
-    def _freshness_score(movie: Movie) -> float:
+    def _freshness_score(movie: Movie, now: datetime) -> float:
         """Newer movies get a slight boost. -10% per year from release."""
         if not movie.release_date:
             return 0.5  # Neutral for unknown dates
         
         try:
-            release = datetime.strptime(movie.release_date, "%Y-%m-%d")
-            years_old = (datetime.now() - release).days / 365.25
+            # Handle both YYYY-MM-DD and just YYYY if TMDB data is sparse
+            date_str = movie.release_date
+            if len(date_str) == 4:
+                date_str += "-01-01"
+            
+            release = datetime.strptime(date_str, "%Y-%m-%d")
+            years_old = (now - release).days / 365.25
             return max(0.0, min(1.0, 1.0 - (years_old * 0.1)))
         except (ValueError, TypeError):
             return 0.5
@@ -318,11 +324,18 @@ class DiversityMixer:
 # ──────────────────────────────────────────────────────────
 
 class RecommendationService:
-    """Smart recommendation service with 3-stage scoring pipeline."""
+    """Smart recommendation service with 3-stage scoring pipeline.
+    
+    Includes prefetch mechanism: when unseen movies drop below
+    PREFETCH_THRESHOLD, triggers a background TMDB sync to replenish.
+    """
+    
+    PREFETCH_THRESHOLD = 10  # Trigger sync when unseen count falls below this
     
     def __init__(self):
         self.supabase_ds = SupabaseDataSource()
         self.mixer = DiversityMixer()
+        self._prefetch_in_progress = False
     
     def get_recommendations(
         self,
@@ -333,10 +346,12 @@ class RecommendationService:
         Get personalized movie recommendations.
         
         Pipeline:
-            1. Fetch unseen movies (Supabase RPC / fallback)
-            2. Build user profile from genre stats
+            1. Check for semantic fingerprint (taste_vector)
+            2a. If taste_vector exists → semantic cosine similarity retrieval
+            2b. If no taste_vector → classic genre-based pipeline
             3. Score movies with multi-factor algorithm
             4. Mix with diversity guarantees
+            5. Prefetch: if pool is running low, trigger TMDB sync
         
         Args:
             user_id: Authenticated user ID (from JWT)
@@ -345,14 +360,41 @@ class RecommendationService:
         Returns:
             List of recommended Movie entities
         """
+        # ── Get swiped IDs for backend-level dedup guard ─────
+        swiped_ids = set(self.supabase_ds.get_user_swiped_movie_ids(user_id))
+
+        # ── Try semantic path first ──────────────────────────
+        taste_profile = self.supabase_ds.get_user_taste_profile(user_id)
+        taste_vector = taste_profile.get("taste_vector") if taste_profile else None
+
+        if taste_vector:
+            semantic_results = self._semantic_recommendations(
+                user_id, taste_vector, limit, swiped_ids
+            )
+            if semantic_results:
+                # Prefetch if the semantic pool is getting thin
+                self._ensure_movie_pool(user_id, len(semantic_results), limit)
+                return semantic_results
+            logger.info(f"🔄 Semantic path returned no results for user {user_id}, falling back to genre-based")
+
+        # ── Classic genre-based path ─────────────────────────
         # STAGE 1: Get unseen movies (Smart Filter)
         unseen_data = self.supabase_ds.get_unseen_movies(user_id, limit=300)
         
         if not unseen_data:
-            logger.info(f"🎬 No unseen movies for user {user_id}")
+            logger.info(f"🎬 No unseen movies for user {user_id} — triggering prefetch")
+            self._trigger_prefetch()
             return []
         
         unseen_movies = [MovieModel(**m).to_entity() for m in unseen_data]
+        
+        # Backend-level dedup guard: filter out any swiped movies that leaked through
+        unseen_movies = [m for m in unseen_movies if m.id not in swiped_ids]
+        
+        if not unseen_movies:
+            logger.info(f"🎬 All movies filtered by dedup guard for user {user_id} — triggering prefetch")
+            self._trigger_prefetch()
+            return []
         
         # STAGE 2: Build user profile
         genre_stats = self.supabase_ds.get_user_genre_stats(user_id)
@@ -381,6 +423,80 @@ class RecommendationService:
             f"({int(limit * 0.8)} personalized + {int(limit * 0.2)} exploration)"
         )
         
+        # Prefetch if pool is running low
+        self._ensure_movie_pool(user_id, len(unseen_movies), limit)
+        
+        return recommendations
+
+    def _semantic_recommendations(
+        self,
+        user_id: str,
+        taste_vector: list,
+        limit: int,
+        swiped_ids: set = None,
+    ) -> List[Movie]:
+        """Fetch recommendations using semantic cosine similarity.
+        
+        Uses the user's taste_vector to query pgvector for the most
+        similar unseen movies, then applies scoring and diversity mixing.
+        """
+        # Fetch semantically similar candidates (3× limit for scoring headroom)
+        semantic_data = self.supabase_ds.get_semantic_recommendations(
+            taste_vector, user_id, limit=limit * 3
+        )
+
+        if not semantic_data:
+            return []
+
+        # Log similarity scores at DEBUG level
+        for item in semantic_data[:10]:  # Top 10 for readability
+            logger.debug(
+                f"DEBUG: Movie [{item.get('name', '?')}] similarity: "
+                f"{item.get('similarity', 0):.3f}"
+            )
+
+        # Convert to Movie entities
+        semantic_movies = [
+            MovieModel(
+                id=m["id"],
+                name=m.get("name", "Unknown"),
+                genre=m.get("genre", "General"),
+                poster_path=m.get("poster_path"),
+                overview=m.get("overview"),
+                release_date=m.get("release_date"),
+                vote_average=m.get("vote_average", 0),
+            ).to_entity()
+            for m in semantic_data
+        ]
+
+        # Backend-level dedup guard
+        if swiped_ids:
+            semantic_movies = [m for m in semantic_movies if m.id not in swiped_ids]
+
+        if not semantic_movies:
+            return []
+
+        # Build profile for scoring + diversity
+        genre_stats = self.supabase_ds.get_user_genre_stats(user_id)
+        profile = UserProfile(genre_stats)
+
+        # Score the semantically retrieved candidates
+        scorer = MovieScorer(profile)
+        scored_movies = scorer.score_movies(semantic_movies)
+
+        # Apply diversity mixing
+        recommendations = self.mixer.mix(
+            scored_movies=scored_movies,
+            all_unseen=semantic_movies,
+            profile=profile,
+            limit=limit,
+        )
+
+        logger.info(
+            f"🧠 Returning {len(recommendations)} semantic recommendations "
+            f"for user {user_id} (from {len(semantic_data)} candidates)"
+        )
+
         return recommendations
     
     def _cold_start_recommendations(
@@ -415,18 +531,72 @@ class RecommendationService:
         random.shuffle(result)
         
         return result
+
+    # ── Prefetch Mechanism ────────────────────────────────────
+
+    def _ensure_movie_pool(self, user_id: str, current_pool_size: int, requested: int) -> None:
+        """Trigger TMDB sync if the unseen movie pool is running low."""
+        if current_pool_size < self.PREFETCH_THRESHOLD:
+            logger.info(
+                f"📡 Movie pool low for user {user_id}: "
+                f"{current_pool_size} unseen (threshold={self.PREFETCH_THRESHOLD}) — triggering prefetch"
+            )
+            self._trigger_prefetch()
+
+    def _trigger_prefetch(self) -> None:
+        """Fire-and-forget TMDB sync in a background thread.
+        
+        Uses a simple flag to prevent multiple concurrent syncs.
+        The flag is not thread-safe but that's acceptable — worst case
+        we get two syncs which is harmless.
+        """
+        if self._prefetch_in_progress:
+            logger.debug("⏳ Prefetch already in progress, skipping")
+            return
+
+        import threading
+
+        def _run_sync():
+            import asyncio
+            try:
+                self._prefetch_in_progress = True
+                logger.info("🔄 Prefetch: starting TMDB sync for new movies...")
+
+                from app.services.movie_sync_service import movie_sync_service
+
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    stats = loop.run_until_complete(
+                        movie_sync_service.sync_movies(
+                            categories=["popular", "now_playing", "top_rated", "trending"],
+                            pages_per_category=2,
+                        )
+                    )
+                    logger.info(
+                        f"✅ Prefetch complete: {stats.get('new_movies', 0)} new movies, "
+                        f"{stats.get('embeddings_generated', 0)} embeddings"
+                    )
+                finally:
+                    loop.close()
+            except Exception as e:
+                logger.error(f"❌ Prefetch sync failed: {e}", exc_info=True)
+            finally:
+                self._prefetch_in_progress = False
+
+        thread = threading.Thread(target=_run_sync, daemon=True)
+        thread.start()
     
     def get_user_stats(self, user_id: str) -> Dict:
         """Get user statistics for profile/debugging."""
         genre_stats = self.supabase_ds.get_user_genre_stats(user_id)
         profile = UserProfile(genre_stats)
         
-        swipes = self.supabase_ds.get_user_swipes(user_id)
-        liked_ids = self.supabase_ds.get_user_liked_movie_ids(user_id)
-        
-        total_swipes = len(swipes)
-        total_likes = len(liked_ids)
-        total_passes = total_swipes - total_likes
+        # Use the new accurate RPC for global counts
+        counts = self.supabase_ds.get_user_stats_rpc(user_id)
+        total_swipes = counts.get("total_swipes", 0)
+        total_likes = counts.get("total_likes", 0)
+        total_passes = counts.get("total_passes", 0)
         
         return {
             "user_id": user_id,
