@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, status, Query
 from typing import List, Dict, Any
 
 from app.data.services.tmdb_service import TMDBService
+from app.core.logger import logger
 
 router = APIRouter(prefix="/movies/search", tags=["search"])
 
@@ -42,9 +43,10 @@ async def search_movies(
             
         return formatted_movies
     except Exception as e:
+        logger.error(f"Movie search failed for query '{query}': {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Search failed: {str(e)}",
+            detail="Search failed",
         )
     finally:
         await tmdb_service.close()

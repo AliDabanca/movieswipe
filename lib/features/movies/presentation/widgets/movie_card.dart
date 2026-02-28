@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:movieswipe/features/movies/domain/entities/movie.dart';
 import 'package:movieswipe/features/movies/presentation/pages/movie_detail_page.dart';
 
@@ -43,33 +44,20 @@ class MovieCard extends StatelessWidget {
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(16)),
                 child: movie.posterPath != null
-                    ? Image.network(
-                        '$tmdbImageBaseUrl${movie.posterPath}',
+                    ? CachedNetworkImage(
+                        imageUrl: '$tmdbImageBaseUrl${movie.posterPath}',
                         fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            color: Colors.grey[300],
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                value:
-                                    loadingProgress.expectedTotalBytes != null
-                                        ? loadingProgress
-                                                .cumulativeBytesLoaded /
-                                            loadingProgress
-                                                .expectedTotalBytes!
-                                        : null,
-                              ),
-                            ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.movie,
-                                size: 100, color: Colors.grey),
-                          );
-                        },
+                        placeholder: (context, url) => Container(
+                          color: Colors.grey[300],
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.movie,
+                              size: 100, color: Colors.grey),
+                        ),
                       )
                     : Container(
                         color: Colors.grey[300],

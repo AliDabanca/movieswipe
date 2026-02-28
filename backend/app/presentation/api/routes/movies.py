@@ -1,6 +1,6 @@
 """Movie routes."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from typing import List
 
 from app.domain.repositories.movie_repository import MovieRepository
@@ -11,6 +11,8 @@ from app.core.errors import NotFoundError
 from app.core.auth import get_current_user_id
 from app.data.services.tmdb_service import TMDBService
 from app.data.datasources.supabase_datasource import SupabaseDataSource
+from app.services.embedding_service import embedding_service
+from app.core.logger import logger
 
 router = APIRouter(prefix="/movies", tags=["movies"])
 
@@ -29,9 +31,10 @@ async def get_movies(
         entities = await repository.get_all()
         return [MovieModel.from_entity(entity) for entity in entities]
     except Exception as e:
+        logger.error(f"Failed to fetch all movies: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch movies: {str(e)}",
+            detail="Failed to fetch movies",
         )
 
 
@@ -60,9 +63,10 @@ async def get_movie(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Failed to fetch movie by ID {movie_id}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch movie: {str(e)}",
+            detail="Failed to fetch movie",
         )
 
 
@@ -79,9 +83,42 @@ async def get_movie_details(movie_id: int):
     """
     tmdb = TMDBService()
     try:
-        # Fetch enriched details from TMDB
-        enriched = await tmdb.get_movie_details_enriched(movie_id)
-        
+        enriched = None
+        try:
+            # Fetch enriched details from TMDB
+            enriched = await tmdb.get_movie_details_enriched(movie_id)
+        except Exception as tmdb_error:
+            logger.warning(f"TMDB details unavailable for {movie_id}: {tmdb_error}")
+            # Fallback: Try to get basic info from our DB
+            ds = SupabaseDataSource()
+            try:
+                local_movie = ds.get_movie_by_id(movie_id)
+                enriched = {
+                    "id": local_movie["id"],
+                    "name": local_movie.get("name", "Unknown"),
+                    "genre": local_movie.get("genre", "General"),
+                    "poster_path": local_movie.get("poster_path"),
+                    "overview": local_movie.get("overview", "Detaylar şu an ulaşılamıyor."),
+                    "release_date": local_movie.get("release_date"),
+                    "vote_average": local_movie.get("vote_average", 0),
+                    # Fill missing fields with defaults
+                    "genres": [local_movie.get("genre", "General")],
+                    "backdrop_path": None,
+                    "overview_en": local_movie.get("overview", ""),
+                    "vote_count": 0,
+                    "runtime": None,
+                    "tagline": None,
+                    "director": None,
+                    "cast": [],
+                    "cast_details": [],
+                }
+            except Exception as db_error:
+                logger.error(f"Critical DB fallback failure for movie {movie_id}: {db_error}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to fetch movie details",
+                )
+
         # Try to get similar movies via vector search
         similar_movies = []
         try:
@@ -100,7 +137,7 @@ async def get_movie_details(movie_id: int):
                 for m in similar_raw
             ]
         except Exception as e:
-            print(f"⚠️  Similar movies unavailable: {e}")
+            logger.warning(f"Similar movies unavailable for movie {movie_id}: {e}")
         
         return MovieDetailModel(
             id=enriched["id"],
@@ -124,9 +161,10 @@ async def get_movie_details(movie_id: int):
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Failed to fetch enriched movie details for movie {movie_id}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch movie details: {str(e)}",
+            detail="Failed to fetch movie details",
         )
     finally:
         await tmdb.close()
@@ -136,6 +174,7 @@ async def get_movie_details(movie_id: int):
 async def swipe_movie(
     movie_id: int,
     request: SwipeRequest,
+    background_tasks: BackgroundTasks,
     user_id: str = Depends(get_current_user_id),
     repository: MovieRepository = Depends(get_movie_repository),
 ):
@@ -154,13 +193,18 @@ async def swipe_movie(
         await repository.swipe(movie_id, request.isLike, user_id)
         
         action = "LIKE" if request.isLike else "PASS"
-        print(f"✅ Swipe saved to DB: User {user_id} - Movie {movie_id} - {action}")
+        logger.info(f"Swipe saved: User {user_id} - Movie {movie_id} - {action}")
+        
+        # Conditionally trigger taste vector update on likes
+        if request.isLike:
+            embedding_service.update_taste_vector(user_id, background_tasks)
         
         return MessageResponse(message=f"Movie {action.lower()}d successfully")
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Critical failure saving swipe for user {user_id}, movie {movie_id}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save swipe: {str(e)}",
+            detail="Failed to save swipe",
         )

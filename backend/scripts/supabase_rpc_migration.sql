@@ -54,3 +54,30 @@ AS $$
     GROUP BY m.genre
     ORDER BY total_count DESC;
 $$;
+
+
+-- Supabase RPC: get_user_stats
+-- Kullanıcının toplam swipe, like ve pass sayılarını döndürür
+-- Accurate global counts regardless of batch limits
+--
+-- Kullanım: SELECT * FROM get_user_stats('user-uuid-here');
+
+CREATE OR REPLACE FUNCTION get_user_stats(
+    p_user_id UUID
+)
+RETURNS TABLE(
+    total_swipes BIGINT,
+    total_likes BIGINT,
+    total_passes BIGINT
+)
+LANGUAGE sql
+STABLE
+AS $$
+    SELECT
+        COUNT(*) AS total_swipes,
+        COUNT(*) FILTER (WHERE is_like = true) AS total_likes,
+        COUNT(*) FILTER (WHERE is_like = false) AS total_passes
+    FROM user_swipes
+    WHERE user_id = p_user_id;
+$$;
+

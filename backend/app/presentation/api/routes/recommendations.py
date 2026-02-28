@@ -1,12 +1,11 @@
-"""Recommendation routes."""
-
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from typing import List
+from typing import List, Optional
+from pydantic import BaseModel
 
 from app.services.recommendation_service import RecommendationService
 from app.data.models.movie_model import MovieModel
-from app.core.errors import ServerError
 from app.core.auth import get_current_user_id
+from app.core.logger import logger
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 
@@ -14,7 +13,14 @@ router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 recommendation_service = RecommendationService()
 
 
-@router.get("/", response_model=List[MovieModel])
+class RecommendationResponse(BaseModel):
+    """Wrapped recommendation response with content status."""
+    status: str  # "ok" | "end_of_content"
+    movies: List[MovieModel]
+    message: Optional[str] = None
+
+
+@router.get("/", response_model=RecommendationResponse)
 async def get_recommendations(
     user_id: str = Depends(get_current_user_id),
     limit: int = Query(50, ge=1, le=100, description="Number of recommendations")
@@ -24,23 +30,32 @@ async def get_recommendations(
     
     User ID is extracted from JWT token automatically.
     
-    Strategy:
-    - Users with < 5 likes: Random/popular movies (cold start)
-    - Users with 5+ likes: 70% personalized + 30% discovery
-    
-    Args:
-        limit: Number of recommendations to return
-        
     Returns:
-        List of recommended movies
+        RecommendationResponse with:
+        - status: "ok" (movies available) or "end_of_content" (pool exhausted)
+        - movies: list of recommended movies
+        - message: optional user-facing message when end_of_content
     """
     try:
         movies = recommendation_service.get_recommendations(user_id, limit)
-        return [MovieModel.from_entity(movie) for movie in movies]
+        
+        if not movies:
+            logger.info(f"🏁 End of content for user {user_id}")
+            return RecommendationResponse(
+                status="end_of_content",
+                movies=[],
+                message="Keşfedecek film kalmadı! Yeni türler seçmeye ne dersin?",
+            )
+        
+        return RecommendationResponse(
+            status="ok",
+            movies=[MovieModel.from_entity(movie) for movie in movies],
+        )
     except Exception as e:
+        logger.error(f"Failed to get recommendations for user {user_id}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get recommendations: {str(e)}",
+            detail="Failed to get recommendations",
         )
 
 
@@ -59,7 +74,8 @@ async def get_user_stats(
         stats = recommendation_service.get_user_stats(user_id)
         return stats
     except Exception as e:
+        logger.error(f"Failed to get user stats for user {user_id}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get user stats: {str(e)}",
+            detail="Failed to get user stats",
         )

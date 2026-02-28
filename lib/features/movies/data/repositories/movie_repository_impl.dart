@@ -58,6 +58,9 @@ class MovieRepositoryImpl implements MovieRepository {
       final movies = remoteMovies.map((model) => model.toEntity()).toList();
       
       return Right(movies);
+    } on EndOfContentException {
+      // Let this bubble up to the bloc for special handling
+      rethrow;
     } on ServerException catch (e) {
       // Fallback to regular movies on failure
       try {

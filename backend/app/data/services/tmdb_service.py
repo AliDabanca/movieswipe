@@ -225,6 +225,7 @@ class TMDBService:
         except httpx.HTTPError as e:
             if hasattr(e, "response") and e.response.status_code == 404:
                 raise ServerError(f"Movie {movie_id} not found in TMDB")
+            print(f"❌ TMDB API connection error for movie {movie_id}: {str(e)}")
             raise ServerError(f"TMDB details error: {str(e)}")
 
     async def get_movie_details_enriched(self, movie_id: int) -> Dict[str, Any]:

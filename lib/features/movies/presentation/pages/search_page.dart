@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:movieswipe/features/movies/domain/entities/movie.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_bloc.dart';
@@ -122,12 +123,20 @@ class _SearchPageState extends State<SearchPage> {
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: posterUrl != null
-              ? Image.network(
-                  posterUrl,
+              ? CachedNetworkImage(
+                  imageUrl: posterUrl,
                   width: 50,
                   height: 75,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
+                  placeholder: (context, url) => Container(
+                    color: Colors.grey[300],
+                    width: 50,
+                    height: 75,
+                    child: const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) =>
                       Container(color: Colors.grey[300], width: 50, height: 75),
                 )
               : Container(

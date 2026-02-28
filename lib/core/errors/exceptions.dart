@@ -28,3 +28,14 @@ class NetworkException implements Exception {
   @override
   String toString() => 'NetworkException: $message';
 }
+
+/// Thrown when backend signals that the movie pool is exhausted
+class EndOfContentException implements Exception {
+  final String message;
+
+  EndOfContentException({required this.message});
+
+  @override
+  String toString() => 'EndOfContentException: $message';
+}
+

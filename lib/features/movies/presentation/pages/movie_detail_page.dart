@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:movieswipe/features/movies/domain/entities/movie.dart';
 import 'package:movieswipe/features/movies/data/models/movie_model.dart';
 import 'package:movieswipe/features/movies/data/datasources/movie_remote_datasource.dart';
@@ -181,10 +182,14 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           children: [
             // Backdrop Image
             if (backdropUrl != null)
-              Image.network(
-                backdropUrl,
+              CachedNetworkImage(
+                imageUrl: backdropUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                placeholder: (context, url) => Container(
+                  color: const Color(0xFF1A1A2E),
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
+                errorWidget: (_, __, ___) => Container(
                   color: const Color(0xFF1A1A2E),
                   child: const Icon(Icons.movie, size: 80, color: Colors.grey),
                 ),
@@ -423,7 +428,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             radius: 32,
             backgroundColor: Colors.white.withValues(alpha: 0.1),
             backgroundImage: actor.profilePath != null
-                ? NetworkImage('$tmdbImageBase$profileSize${actor.profilePath}')
+                ? CachedNetworkImageProvider(
+                    '$tmdbImageBase$profileSize${actor.profilePath}')
                 : null,
             child: actor.profilePath == null
                 ? Icon(Icons.person, color: Colors.white.withValues(alpha: 0.5))
@@ -510,12 +516,18 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(12)),
               child: movie.posterPath != null
-                  ? Image.network(
-                      '$tmdbImageBase$posterSize${movie.posterPath}',
+                  ? CachedNetworkImage(
+                      imageUrl: '$tmdbImageBase$posterSize${movie.posterPath}',
                       height: 150,
                       width: 120,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      placeholder: (context, url) => Container(
+                        height: 150,
+                        width: 120,
+                        color: Colors.grey[800],
+                        child: const Center(child: CircularProgressIndicator()),
+                      ),
+                      errorWidget: (_, __, ___) => Container(
                         height: 150,
                         color: Colors.grey[800],
                         child: const Icon(

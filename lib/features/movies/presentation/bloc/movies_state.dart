@@ -55,3 +55,14 @@ class MovieSwiped extends MoviesState {
   @override
   List<Object> get props => [movieId, isLike];
 }
+
+/// End of content — movie pool exhausted
+class MoviesEndOfContent extends MoviesState {
+  final String message;
+
+  const MoviesEndOfContent({required this.message});
+
+  @override
+  List<Object> get props => [message];
+}
+

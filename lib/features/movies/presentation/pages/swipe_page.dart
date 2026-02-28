@@ -33,6 +33,8 @@ class _SwipePageState extends State<SwipePage> {
       builder: (context, state) {
         if (state is MoviesLoading || state is MoviesInitial) {
           return _buildLoadingSkeleton(context);
+        } else if (state is MoviesEndOfContent) {
+          return _buildEndOfContent(context, state.message);
         } else if (state is MoviesLoaded) {
           return _buildSwipeCards(context, state.movies);
         } else if (state is MoviesError) {
@@ -204,6 +206,61 @@ class _SwipePageState extends State<SwipePage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// End of content screen — movie pool exhausted
+  Widget _buildEndOfContent(BuildContext context, String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.amber.withValues(alpha: 0.15),
+              ),
+              child: const Icon(
+                Icons.explore_off_rounded,
+                size: 80,
+                color: Colors.amber,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Yeni filmler eklendiğinde bilgilendirileceksin!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: () {
+                context.read<MoviesBloc>().add(LoadMoviesEvent());
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Tekrar Dene'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

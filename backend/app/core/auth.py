@@ -1,8 +1,8 @@
 """Supabase JWT authentication for FastAPI."""
 
 from fastapi import Request, HTTPException, status
-from supabase import create_client
-from app.core.config import settings
+from app.core.supabase import supabase
+from app.core.logger import logger
 
 
 async def get_current_user_id(request: Request) -> str:
@@ -10,7 +10,7 @@ async def get_current_user_id(request: Request) -> str:
     Extract and validate user ID from Supabase JWT token.
     
     The token is sent in the Authorization header as 'Bearer <token>'.
-    We use the Supabase client to verify the token and extract the user.
+    We use the shared Supabase client to verify the token.
     
     Args:
         request: FastAPI request
@@ -24,6 +24,7 @@ async def get_current_user_id(request: Request) -> str:
     auth_header = request.headers.get("Authorization")
     
     if not auth_header or not auth_header.startswith("Bearer "):
+        logger.warning("Authentication attempt with missing or invalid header")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing or invalid authorization header",
@@ -32,21 +33,25 @@ async def get_current_user_id(request: Request) -> str:
     token = auth_header.split(" ")[1]
     
     try:
-        # Use Supabase client to verify token and get user
-        client = create_client(settings.supabase_url, settings.supabase_key)
-        user_response = client.auth.get_user(token)
+        # Reusing the global Supabase client
+        user_response = supabase.auth.get_user(token)
         
         if not user_response or not user_response.user:
+            logger.warning("Invalid or expired session token provided")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired token",
+                detail="Invalid or expired session",
             )
+        
+        logger.info(f"User {user_response.user.id} authenticated successfully")
         
         return user_response.user.id
     except HTTPException:
         raise
     except Exception as e:
+        # Log the actual error internally with stack trace, but return a generic message to the user
+        logger.error(f"Deep Authentication Failure: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Authentication failed: {str(e)}",
+            detail="Authentication failed",
         )

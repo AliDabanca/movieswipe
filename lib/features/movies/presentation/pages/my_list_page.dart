@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:movieswipe/core/providers/liked_movies_provider.dart';
 
@@ -297,41 +298,37 @@ class _MyListContentState extends State<_MyListContent> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: posterUrl != null
-                    ? Image.network(
-                        posterUrl,
+                    ? CachedNetworkImage(
+                        imageUrl: posterUrl,
                         fit: BoxFit.cover,
                         width: double.infinity,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Color(0xFF6366F1), Color(0xFFEC4899)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
+                        placeholder: (context, url) => Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xFF6366F1).withOpacity(0.3),
+                                const Color(0xFFEC4899).withOpacity(0.3)
+                              ],
                             ),
-                            child: const Icon(Icons.movie, size: 50, color: Colors.white),
-                          );
-                        },
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Color(0xFF6366F1).withOpacity(0.3), Color(0xFFEC4899).withOpacity(0.3)],
-                              ),
+                          ),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
                             ),
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                value: loadingProgress.expectedTotalBytes != null
-                                    ? loadingProgress.cumulativeBytesLoaded /
-                                        loadingProgress.expectedTotalBytes!
-                                    : null,
-                              ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF6366F1), Color(0xFFEC4899)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
-                          );
-                        },
+                          ),
+                          child: const Icon(Icons.movie,
+                              size: 50, color: Colors.white),
+                        ),
                       )
                     : Container(
                         decoration: BoxDecoration(
