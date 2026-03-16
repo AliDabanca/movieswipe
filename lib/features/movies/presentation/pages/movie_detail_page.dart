@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:movieswipe/features/movies/domain/entities/movie.dart';
 import 'package:movieswipe/features/movies/data/models/movie_model.dart';
 import 'package:movieswipe/features/movies/data/datasources/movie_remote_datasource.dart';
 import 'package:movieswipe/core/network/api_client.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
+import 'package:movieswipe/core/providers/liked_movies_provider.dart';
+import 'package:movieswipe/features/movies/presentation/bloc/movies_bloc.dart';
+import 'package:movieswipe/features/movies/presentation/bloc/movies_event.dart';
 
 /// Premium movie detail page with hero poster, credits, and similar movies
 class MovieDetailPage extends StatefulWidget {
@@ -22,13 +28,16 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   static const String profileSize = '/w185';
 
   MovieDetailModel? _detail;
+  Map<String, dynamic>? _watchProvidersData;
   bool _isLoading = true;
   String? _error;
+  int? _localRating;
 
   @override
   void initState() {
     super.initState();
     _loadDetails();
+    _localRating = widget.movie.userRating;
   }
 
   Future<void> _loadDetails() async {
@@ -37,9 +46,19 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       final datasource = MovieRemoteDataSourceImpl(apiClient: apiClient);
 
       final detail = await datasource.getMovieDetails(widget.movie.id);
+      
+      // Fetch watch providers concurrently/silently
+      Map<String, dynamic>? providersData;
+      try {
+        providersData = await apiClient.get('/movies/${widget.movie.id}/watch-providers') as Map<String, dynamic>?;
+      } catch (e) {
+        // Ignore watch provider errors so it doesn't break the page
+      }
+
       if (mounted) {
         setState(() {
           _detail = detail;
+          _watchProvidersData = providersData;
           _isLoading = false;
         });
       }
@@ -49,6 +68,47 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           _error = e.toString();
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _updateRating(int rating) async {
+    final originalRating = _localRating;
+    setState(() => _localRating = rating);
+
+    try {
+      final apiClient = ApiClient();
+      // Call swipe endpoint with isLike=true and the new rating
+      await apiClient.post(
+        '/movies/${widget.movie.id}/swipe',
+        body: {'isLike': true, 'rating': rating},
+      );
+      
+      if (mounted) {
+        // Update local provider state so it reflects in My List immediately
+        context.read<LikedMoviesProvider>().updateMovieRating(widget.movie.id, rating);
+        
+        // NEW: Also update MoviesBloc so the card in the background is updated
+        context.read<MoviesBloc>().add(UpdateMovieRatingEvent(
+          movieId: widget.movie.id,
+          rating: rating,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMessage = 'Puan güncellenemedi';
+        if (e.toString().contains('401')) {
+          errorMessage = 'Oturum süresi dolmuş, lütfen tekrar giriş yapın.';
+        } else if (e.toString().contains('500')) {
+          errorMessage = 'Sunucu hatası, lütfen daha sonra tekrar deneyin.';
+        } else {
+          errorMessage = 'Hata: $e';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+        setState(() => _localRating = originalRating);
       }
     }
   }
@@ -127,12 +187,18 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                 _buildTitleRow(d),
                 const SizedBox(height: 12),
                 _buildMetadataChips(d),
+                const SizedBox(height: 16),
+                _buildStarRating(),
                 if (d.tagline != null && d.tagline!.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   _buildTagline(d.tagline!),
                 ],
                 const SizedBox(height: 20),
                 _buildOverview(d),
+                if (_watchProvidersData != null) ...[
+                  const SizedBox(height: 24),
+                  _buildWatchProviders(),
+                ],
                 if (d.director != null) ...[
                   const SizedBox(height: 24),
                   _buildDirector(d.director!),
@@ -270,6 +336,41 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     return const Color(0xFFE74C3C);
   }
 
+  Widget _buildStarRating() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Senin Puanın',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: List.generate(5, (index) {
+            final starIndex = index + 1;
+            final isFilled = _localRating != null && starIndex <= _localRating!;
+            
+            return GestureDetector(
+              onTap: () => _updateRating(starIndex),
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: Icon(
+                  isFilled ? Icons.star : Icons.star_border,
+                  color: isFilled ? const Color(0xFFFFD700) : Colors.white.withOpacity(0.3),
+                  size: 32,
+                ),
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
   Widget _buildMetadataChips(MovieDetailModel d) {
     final items = <String>[];
     if (d.genres.isNotEmpty) {
@@ -347,6 +448,126 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
         ),
       ],
     );
+  }
+
+  Widget _buildWatchProviders() {
+    final providers = (_watchProvidersData?['providers'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final tmdbLink = _watchProvidersData?['tmdb_link'] as String?;
+
+    if (providers.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Nereden İzleyebilirim?',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (tmdbLink != null && tmdbLink.isNotEmpty)
+              GestureDetector(
+                onTap: () async {
+                  final url = Uri.parse(tmdbLink);
+                  if (await canLaunchUrl(url)) {
+                    await launchUrl(url);
+                  }
+                },
+                child: const Text(
+                  'JustWatch',
+                  style: TextStyle(
+                    color: Color(0xFF6366F1),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 48,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: providers.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final p = providers[index];
+              return _buildProviderChip(p);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProviderChip(Map<String, dynamic> provider) {
+    final logoPath = provider['logo_path'];
+    return Container(
+      padding: const EdgeInsets.only(right: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: Colors.transparent,
+            child: ClipOval(
+              child: logoPath != null
+                  ? CachedNetworkImage(
+                      imageUrl: 'https://image.tmdb.org/t/p/w200$logoPath',
+                      fit: BoxFit.cover,
+                      width: 40,
+                      height: 40,
+                    )
+                  : Container(
+                      color: Colors.grey[800],
+                      child: const Icon(Icons.tv, size: 20, color: Colors.white),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                provider['provider_name'] ?? 'Unknown',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                _getProviderTypeName(provider['provider_type']),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getProviderTypeName(String? type) {
+    if (type == 'flatrate') return 'Abonelik';
+    if (type == 'rent') return 'Kiralama';
+    if (type == 'buy') return 'Satın Alma';
+    return 'İzleme';
   }
 
   Widget _buildDirector(String director) {
@@ -498,7 +719,10 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => MovieDetailPage(movie: movie.toEntity()),
+            builder: (_) => BlocProvider.value(
+              value: context.read<MoviesBloc>(),
+              child: MovieDetailPage(movie: movie.toEntity()),
+            ),
           ),
         );
       },

@@ -7,7 +7,7 @@ abstract class MovieRemoteDataSource {
   Future<List<MovieModel>> getMovies();
   Future<List<MovieModel>> getRecommendedMovies(); // NEW: Personalized recommendations
   Future<List<MovieModel>> searchMovies(String query);
-  Future<void> swipeMovie(int movieId, bool isLike, String userId);
+  Future<void> swipeMovie(int movieId, bool isLike, String userId, {int? rating});
   Future<MovieDetailModel> getMovieDetails(int movieId);
 }
 
@@ -75,12 +75,13 @@ class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
   }
 
   @override
-  Future<void> swipeMovie(int movieId, bool isLike, String userId) async {
+  Future<void> swipeMovie(int movieId, bool isLike, String userId, {int? rating}) async {
     try {
       await apiClient.post(
         '/movies/$movieId/swipe',
         body: {
           'isLike': isLike,
+          if (rating != null) 'rating': rating,
           // userId now comes from JWT token automatically via ApiClient headers
         },
       );

@@ -65,4 +65,12 @@ class MoviesEndOfContent extends MoviesState {
   @override
   List<Object> get props => [message];
 }
+/// State when a random movie has been picked
+class RandomMovieSelected extends MoviesState {
+  final Movie movie;
 
+  const RandomMovieSelected({required this.movie});
+
+  @override
+  List<Object> get props => [movie];
+}

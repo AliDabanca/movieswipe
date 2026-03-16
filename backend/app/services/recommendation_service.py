@@ -8,7 +8,7 @@ Architecture:
 
 import random
 import logging
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 from datetime import datetime
 from collections import Counter
 
@@ -612,16 +612,17 @@ class RecommendationService:
             "genre_stats_raw": genre_stats,
         }
     
-    def get_liked_movies_by_genre(self, user_id: str) -> Dict[str, List[Dict]]:
-        """Get user's liked movies grouped by genre."""
+    def get_liked_movies_by_genre(self, user_id: str) -> Dict[str, Any]:
+        """Get user's liked movies grouped by genre and the recent 10 additions."""
         liked_swipes = self.supabase_ds.client.table("user_swipes")\
-            .select("movie_id")\
+            .select("movie_id, swiped_at, rating")\
             .eq("user_id", user_id)\
             .eq("is_like", True)\
+            .order("swiped_at", desc=True)\
             .execute()
         
         if not liked_swipes.data:
-            return {}
+            return {"recently_added": [], "by_genre": {}}
         
         liked_movie_ids = [swipe["movie_id"] for swipe in liked_swipes.data]
         
@@ -629,22 +630,46 @@ class RecommendationService:
             movies_data = self.supabase_ds.get_movies_by_ids(liked_movie_ids)
         except Exception as e:
             logger.error(f"Error batch fetching movies: {e}")
-            return {}
+            return {"recently_added": [], "by_genre": {}}
+        
+        # Map by id to preserve swipe chronological order and include ratings
+        swipe_map = {s["movie_id"]: s for s in liked_swipes.data}
+        movie_map = {m["id"]: m for m in movies_data}
+        
+        formatted_movies = []
+        for m_id in liked_movie_ids:
+            if m_id not in movie_map:
+                continue
+                
+            movie = movie_map[m_id]
+            swipe = swipe_map.get(m_id, {})
+            
+            formatted_movies.append({
+                "id": movie["id"],
+                "name": movie["name"],
+                "genre": movie.get("genre", "General"),
+                "poster_path": movie.get("poster_path"),
+                "vote_average": movie.get("vote_average", 0.0),
+                "release_date": movie.get("release_date"),
+                "user_rating": swipe.get("rating")
+            })
+            
+        recently_added = formatted_movies[:10]
         
         # Group by genre
         movies_by_genre = {}
-        for movie in movies_data:
-            genre = movie.get("genre", "General")
+        for movie in formatted_movies:
+            genre = movie["genre"]
             if genre not in movies_by_genre:
                 movies_by_genre[genre] = []
-            movies_by_genre[genre].append({
-                "id": movie["id"],
-                "name": movie["name"],
-                "genre": genre,
-                "poster_path": movie.get("poster_path"),
-            })
+            movies_by_genre[genre].append(movie)
         
         # Sort by count
-        return dict(sorted(
+        sorted_genres = dict(sorted(
             movies_by_genre.items(), key=lambda x: len(x[1]), reverse=True
         ))
+        
+        return {
+            "recently_added": recently_added,
+            "by_genre": sorted_genres
+        }

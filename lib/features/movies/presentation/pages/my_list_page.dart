@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:movieswipe/core/providers/liked_movies_provider.dart';
+import 'package:movieswipe/features/movies/domain/entities/movie.dart';
+import 'package:movieswipe/features/movies/presentation/bloc/movies_bloc.dart';
+import 'package:movieswipe/features/movies/presentation/pages/movie_detail_page.dart';
+import 'package:movieswipe/features/movies/presentation/widgets/dice_roll_animation.dart';
+import 'dart:math' as math;
 
 /// My List page showing liked movies grouped by genre
 class MyListPage extends StatelessWidget {
@@ -57,7 +63,7 @@ class MyListPage extends StatelessWidget {
           );
         }
 
-        return _MyListContent(moviesByGenre: provider.moviesByGenre);
+        return _MyListContent();
       },
     );
   }
@@ -65,9 +71,7 @@ class MyListPage extends StatelessWidget {
 
 /// Stateful content widget for genre filtering
 class _MyListContent extends StatefulWidget {
-  final Map<String, List<Map<String, dynamic>>> moviesByGenre;
-
-  const _MyListContent({required this.moviesByGenre});
+  const _MyListContent();
 
   @override
   State<_MyListContent> createState() => _MyListContentState();
@@ -75,17 +79,54 @@ class _MyListContent extends StatefulWidget {
 
 class _MyListContentState extends State<_MyListContent> {
   String? _selectedGenre;
+  String _searchQuery = '';
+  bool _isCategoryOpen = false;
+  bool _isRollingDice = false;
+  Map<String, dynamic>? _selectedRandomMovie;
+  final TextEditingController _searchController = TextEditingController();
 
-  Map<String, List<Map<String, dynamic>>> get _filteredMovies {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Map<String, List<Map<String, dynamic>>> _getFilteredMovies(LikedMoviesProvider provider) {
+    // Start with genre filter and apply active sort logic from provider
+    Map<String, List<Map<String, dynamic>>> result = {};
     if (_selectedGenre == null) {
-      return widget.moviesByGenre;
+      for (final genre in provider.moviesByGenre.keys) {
+        // Limit each genre row to max 10 items when viewing "All"
+        result[genre] = provider.getSortedMoviesByGenre(genre).take(10).toList();
+      }
+    } else {
+      result[_selectedGenre!] = provider.getSortedMoviesByGenre(_selectedGenre);
     }
-    return {_selectedGenre!: widget.moviesByGenre[_selectedGenre] ?? []};
+
+    // Apply search filter on top
+    if (_searchQuery.isEmpty) {
+      return result;
+    }
+
+    final query = _searchQuery.toLowerCase();
+    final filtered = <String, List<Map<String, dynamic>>>{};
+    for (final entry in result.entries) {
+      final matchingMovies = entry.value
+          .where((m) => (m['name'] as String? ?? '').toLowerCase().contains(query))
+          .toList();
+      if (matchingMovies.isNotEmpty) {
+        filtered[entry.key] = matchingMovies;
+      }
+    }
+    return filtered;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final provider = context.watch<LikedMoviesProvider>();
+    final filteredMoviesMap = _getFilteredMovies(provider);
+
+    final scaffold = Scaffold(
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -105,6 +146,57 @@ class _MyListContentState extends State<_MyListContent> {
               pinned: true,
               expandedHeight: 120,
               backgroundColor: Colors.transparent,
+              actions: [
+                IconButton(
+                  onPressed: () {
+                    final provider = context.read<LikedMoviesProvider>();
+                    final allMovies = <Map<String, dynamic>>[];
+                    for (final movies in provider.moviesByGenre.values) {
+                      allMovies.addAll(movies);
+                    }
+
+                    if (allMovies.isNotEmpty) {
+                      final random = math.Random().nextInt(allMovies.length);
+                      setState(() {
+                        _selectedRandomMovie = allMovies[random];
+                        _isRollingDice = true;
+                      });
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Hiç beğenilen film bulunamadı!'),
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.casino, color: Colors.amber, size: 28),
+                  tooltip: 'Şansına bir film seç!',
+                ),
+                PopupMenuButton<SortCriteria>(
+                  icon: const Icon(Icons.sort, color: Colors.white),
+                  onSelected: (criteria) => provider.setSortCriteria(criteria),
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: SortCriteria.recentlyAdded,
+                      child: Text('En Son Eklenenler'),
+                    ),
+                    const PopupMenuItem(
+                      value: SortCriteria.highestRated,
+                      child: Text('En Yüksek Puanlılar'),
+                    ),
+                    const PopupMenuItem(
+                      value: SortCriteria.alphabetical,
+                      child: Text('A-Z'),
+                    ),
+                    const PopupMenuItem(
+                      value: SortCriteria.releaseDate,
+                      child: Text('Çıkış Tarihi'),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 8),
+              ],
               flexibleSpace: FlexibleSpaceBar(
                 title: const Text(
                   'My List',
@@ -117,18 +209,151 @@ class _MyListContentState extends State<_MyListContent> {
                 titlePadding: const EdgeInsets.only(left: 24, bottom: 16),
               ),
             ),
-            
-            // Genre Filter Chips
+
+            // Search Bar
             SliverToBoxAdapter(
-              child: Container(
-                height: 60,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                  style: const TextStyle(color: Colors.white),
+                  cursorColor: Colors.white,
+                  decoration: InputDecoration(
+                    hintText: 'Search your movies...',
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                    prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.7)),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear, color: Colors.white.withOpacity(0.7)),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _searchQuery = '';
+                              });
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.15),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: Colors.white, width: 1.5),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            
+            // Recently Added Band
+            if (_selectedGenre == null && _searchQuery.isEmpty && provider.recentlyAddedAll.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: _buildGenreSection(
+                    'Son Eklenenler',
+                    provider.recentlyAddedAll.take(10).toList(),
+                  ),
+                ),
+              ),
+
+            // Category Toggle Bar
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Column(
                   children: [
-                    _buildGenreChip('All', null),
-                    ...widget.moviesByGenre.keys.map((genre) => _buildGenreChip(genre, genre)),
+                    // Toggle Button — compact Netflix-style pill
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isCategoryOpen = !_isCategoryOpen;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: _isCategoryOpen
+                                  ? Colors.white.withOpacity(0.5)
+                                  : Colors.white.withOpacity(0.25),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _selectedGenre ?? 'Categories',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              AnimatedRotation(
+                                turns: _isCategoryOpen ? 0.5 : 0.0,
+                                duration: const Duration(milliseconds: 200),
+                                child: Icon(
+                                  Icons.keyboard_arrow_down_rounded,
+                                  color: Colors.white.withOpacity(0.8),
+                                  size: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Expandable Genre Panel
+                    AnimatedCrossFade(
+                      firstChild: const SizedBox.shrink(),
+                      secondChild: Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(top: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.15),
+                          ),
+                        ),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _buildGenreChip('All', null, provider),
+                            ...provider.moviesByGenre.keys.map(
+                              (genre) => _buildGenreChip(genre, genre, provider),
+                            ),
+                          ],
+                        ),
+                      ),
+                      crossFadeState: _isCategoryOpen
+                          ? CrossFadeState.showSecond
+                          : CrossFadeState.showFirst,
+                      duration: const Duration(milliseconds: 250),
+                      sizeCurve: Curves.easeInOut,
+                    ),
                   ],
                 ),
               ),
@@ -140,13 +365,12 @@ class _MyListContentState extends State<_MyListContent> {
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
-                    final filteredMovies = _filteredMovies;
-                    final genre = filteredMovies.keys.elementAt(index);
-                    final movies = filteredMovies[genre]!;
+                    final genre = filteredMoviesMap.keys.elementAt(index);
+                    final movies = filteredMoviesMap[genre]!;
                     
                     return _buildGenreSection(genre, movies);
                   },
-                  childCount: _filteredMovies.length,
+                  childCount: filteredMoviesMap.length,
                 ),
               ),
             ),
@@ -154,30 +378,85 @@ class _MyListContentState extends State<_MyListContent> {
         ),
       ),
     );
+
+    return Stack(
+      children: [
+        scaffold,
+        if (_isRollingDice && _selectedRandomMovie != null)
+          Container(
+            color: Colors.black.withOpacity(0.7),
+            child: Center(
+              child: DiceRollAnimation(
+                onComplete: () {
+                  final movie = _selectedRandomMovie!;
+                  final movieEntity = Movie(
+                    id: movie['id'],
+                    name: movie['name'],
+                    genre: movie['genre'] ?? 'General',
+                    posterPath: movie['poster_path'],
+                    voteAverage: (movie['vote_average'] as num?)?.toDouble(),
+                    userRating: movie['user_rating'] as int?,
+                  );
+
+                  setState(() {
+                    _isRollingDice = false;
+                    _selectedRandomMovie = null;
+                  });
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => BlocProvider.value(
+                        value: context.read<MoviesBloc>(),
+                        child: MovieDetailPage(movie: movieEntity),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
-  Widget _buildGenreChip(String label, String? genreValue) {
+  Widget _buildGenreChip(String label, String? genreValue, LikedMoviesProvider provider) {
     final isSelected = _selectedGenre == genreValue;
-    
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label),
-        selected: isSelected,
-        onSelected: (selected) {
-          setState(() {
-            _selectedGenre = genreValue;
-          });
-        },
-        backgroundColor: Colors.white.withOpacity(0.9),
-        selectedColor: Color(0xFFEC4899),
-        labelStyle: TextStyle(
-          color: isSelected ? Colors.white : Color(0xFF6366F1),
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedGenre = genreValue;
+          _isCategoryOpen = false; // collapse after selection
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFFEC4899)
+              : Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? Colors.white.withOpacity(0.5)
+                : Colors.white.withOpacity(0.2),
+          ),
         ),
-        checkmarkColor: Colors.white,
-        elevation: isSelected ? 4 : 2,
-        shadowColor: Colors.black.withOpacity(0.3),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -278,20 +557,40 @@ class _MyListContentState extends State<_MyListContent> {
     return AnimatedOpacity(
       opacity: 1.0,
       duration: Duration(milliseconds: 300 + (index * 50)),
-      child: Container(
-        width: 150,
-        margin: const EdgeInsets.only(right: 16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 12,
-              offset: Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
+      child: GestureDetector(
+        onTap: () {
+          final movieEntity = Movie(
+            id: movie['id'],
+            name: movie['name'],
+            genre: movie['genre'] ?? 'General',
+            posterPath: movie['poster_path'],
+            voteAverage: (movie['vote_average'] as num?)?.toDouble(),
+            userRating: movie['user_rating'] as int?,
+          );
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => BlocProvider.value(
+                  value: context.read<MoviesBloc>(),
+                  child: MovieDetailPage(movie: movieEntity),
+                ),
+              ),
+            );
+        },
+        child: Container(
+          width: 150,
+          margin: const EdgeInsets.only(right: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
@@ -306,8 +605,8 @@ class _MyListContentState extends State<_MyListContent> {
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                const Color(0xFF6366F1).withOpacity(0.3),
-                                const Color(0xFFEC4899).withOpacity(0.3)
+                                const Color(0xFF6366F1).withValues(alpha: 0.3),
+                                const Color(0xFFEC4899).withValues(alpha: 0.3)
                               ],
                             ),
                           ),
@@ -342,7 +641,20 @@ class _MyListContentState extends State<_MyListContent> {
                       ),
               ),
             ),
-            const SizedBox(height: 12),
+            if (movie['user_rating'] != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0, left: 4.0),
+                child: Row(
+                  children: List.generate(5, (index) {
+                    return Icon(
+                      index < (movie['user_rating'] as int) ? Icons.star : Icons.star_border,
+                      color: const Color(0xFFFFD700),
+                      size: 14,
+                    );
+                  }),
+                ),
+              ),
+            const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(
@@ -366,6 +678,7 @@ class _MyListContentState extends State<_MyListContent> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

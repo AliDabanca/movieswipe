@@ -14,6 +14,7 @@ class Movie:
     overview: str | None = None
     release_date: str | None = None
     vote_average: float | None = None
+    user_rating: int | None = None
 
     def __eq__(self, other):
         if not isinstance(other, Movie):

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from typing import List
 
 from app.domain.repositories.movie_repository import MovieRepository
-from app.data.models.movie_model import MovieModel, MovieDetailModel
+from app.data.models.movie_model import MovieModel, MovieDetailModel, WatchProviderModel, WatchProvidersResponse
 from app.presentation.api.dependencies import get_movie_repository
 from app.presentation.schemas.requests import SwipeRequest, MessageResponse
 from app.core.errors import NotFoundError
@@ -71,22 +71,39 @@ async def get_movie(
 
 
 @router.get("/{movie_id}/details", response_model=MovieDetailModel)
-async def get_movie_details(movie_id: int):
+async def get_movie_details(
+    movie_id: int,
+    user_id: str = Depends(get_current_user_id),
+):
     """
     Get enriched movie details with credits, TR/EN overview, and similar movies.
-    
-    Args:
-        movie_id: The TMDB movie ID
-    
-    Returns:
-        MovieDetailModel with director, cast, overview, similar movies
+    Also includes the user's personal rating if available.
     """
     tmdb = TMDBService()
+    ds = SupabaseDataSource()
+    
+    # Try to get user's existing rating
+    user_rating = None
+    try:
+        swipe = ds.client.table("user_swipes") \
+            .select("rating") \
+            .eq("user_id", user_id) \
+            .eq("movie_id", movie_id) \
+            .maybe_single() \
+            .execute()
+        if swipe.data:
+            user_rating = swipe.data.get("rating")
+    except Exception as e:
+        logger.warning(f"Failed to fetch user rating for movie {movie_id}: {e}")
+
     try:
         enriched = None
         try:
             # Fetch enriched details from TMDB
             enriched = await tmdb.get_movie_details_enriched(movie_id)
+            # Add the user's rating to the enriched data
+            if enriched:
+                enriched["user_rating"] = user_rating
         except Exception as tmdb_error:
             logger.warning(f"TMDB details unavailable for {movie_id}: {tmdb_error}")
             # Fallback: Try to get basic info from our DB
@@ -101,6 +118,7 @@ async def get_movie_details(movie_id: int):
                     "overview": local_movie.get("overview", "Detaylar şu an ulaşılamıyor."),
                     "release_date": local_movie.get("release_date"),
                     "vote_average": local_movie.get("vote_average", 0),
+                    "user_rating": user_rating,
                     # Fill missing fields with defaults
                     "genres": [local_movie.get("genre", "General")],
                     "backdrop_path": None,
@@ -170,6 +188,35 @@ async def get_movie_details(movie_id: int):
         await tmdb.close()
 
 
+@router.get("/{movie_id}/watch-providers", response_model=WatchProvidersResponse)
+async def get_watch_providers(movie_id: int, country: str = "TR"):
+    """
+    Get streaming/watch providers for a movie.
+    
+    Args:
+        movie_id: The TMDB movie ID
+        country: ISO 3166-1 country code (default: TR)
+    
+    Returns:
+        WatchProvidersResponse with list of providers and TMDB link
+    """
+    tmdb = TMDBService()
+    try:
+        data = await tmdb.get_watch_providers(movie_id, country=country)
+        providers = [
+            WatchProviderModel(**p) for p in data.get("providers", [])
+        ]
+        return WatchProvidersResponse(
+            providers=providers,
+            tmdb_link=data.get("tmdb_link", ""),
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch watch providers for movie {movie_id}: {str(e)}", exc_info=True)
+        # Return empty rather than error — watch providers are non-critical
+        return WatchProvidersResponse(providers=[], tmdb_link="")
+    finally:
+        await tmdb.close()
+
 @router.post("/{movie_id}/swipe", response_model=MessageResponse)
 async def swipe_movie(
     movie_id: int,
@@ -190,7 +237,7 @@ async def swipe_movie(
     """
     try:
         # Save swipe via repository
-        await repository.swipe(movie_id, request.isLike, user_id)
+        await repository.swipe(movie_id, request.isLike, user_id, request.rating)
         
         action = "LIKE" if request.isLike else "PASS"
         logger.info(f"Swipe saved: User {user_id} - Movie {movie_id} - {action}")

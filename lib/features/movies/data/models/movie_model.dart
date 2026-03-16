@@ -10,6 +10,7 @@ class MovieModel extends Movie {
     super.releaseDate,
     super.overview,
     super.voteAverage,
+    super.userRating,
   });
 
   /// Create from JSON
@@ -22,6 +23,7 @@ class MovieModel extends Movie {
       releaseDate: json['release_date'] as String?,
       overview: json['overview'] as String?,
       voteAverage: (json['vote_average'] as num?)?.toDouble(),
+      userRating: json['user_rating'] as int?,
     );
   }
 
@@ -35,6 +37,7 @@ class MovieModel extends Movie {
       'release_date': releaseDate,
       'overview': overview,
       'vote_average': voteAverage,
+      'user_rating': userRating,
     };
   }
 
@@ -48,6 +51,7 @@ class MovieModel extends Movie {
       releaseDate: releaseDate,
       overview: overview,
       voteAverage: voteAverage,
+      userRating: userRating,
     );
   }
 }
@@ -73,6 +77,7 @@ class MovieDetailModel extends MovieModel {
     super.releaseDate,
     super.overview,
     super.voteAverage,
+    super.userRating,
     this.genres = const [],
     this.backdropPath,
     this.overviewEn,
@@ -96,6 +101,7 @@ class MovieDetailModel extends MovieModel {
       overview: json['overview'] as String?,
       overviewEn: json['overview_en'] as String?,
       voteAverage: (json['vote_average'] as num?)?.toDouble(),
+      userRating: json['user_rating'] as int?,
       voteCount: json['vote_count'] as int? ?? 0,
       genres: (json['genres'] as List<dynamic>?)
               ?.map((e) => e as String)
@@ -130,6 +136,7 @@ class MovieDetailModel extends MovieModel {
       releaseDate: releaseDate,
       overview: overview,
       voteAverage: voteAverage,
+      userRating: userRating,
       genres: genres,
       backdropPath: backdropPath,
       overviewEn: overviewEn,

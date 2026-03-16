@@ -20,6 +20,33 @@ class MoviesBloc extends Bloc<MoviesEvent, MoviesState> {
     on<LoadMoviesEvent>(_onLoadMovies);
     on<SwipeMovieEvent>(_onSwipeMovie);
     on<SearchMoviesEvent>(_onSearchMovies);
+    on<UpdateMovieRatingEvent>(_onUpdateMovieRating);
+    on<GetRandomMovieEvent>(_onGetRandomMovie);
+  }
+
+  void _onUpdateMovieRating(
+    UpdateMovieRatingEvent event,
+    Emitter<MoviesState> emit,
+  ) {
+    if (state is MoviesLoaded) {
+      final currentState = state as MoviesLoaded;
+      final updatedMovies = currentState.movies.map((movie) {
+        if (movie.id == event.movieId) {
+          return movie.copyWith(userRating: event.rating);
+        }
+        return movie;
+      }).toList();
+      emit(MoviesLoaded(movies: updatedMovies));
+    } else if (state is MoviesSearchLoaded) {
+      final currentState = state as MoviesSearchLoaded;
+      final updatedMovies = currentState.movies.map((movie) {
+        if (movie.id == event.movieId) {
+          return movie.copyWith(userRating: event.rating);
+        }
+        return movie;
+      }).toList();
+      emit(MoviesSearchLoaded(movies: updatedMovies));
+    }
   }
 
   /// Handle load movies event
@@ -41,6 +68,27 @@ class MoviesBloc extends Bloc<MoviesEvent, MoviesState> {
     }
   }
 
+  Future<void> _onSwipeMovie(
+    SwipeMovieEvent event,
+    Emitter<MoviesState> emit,
+  ) async {
+    final result = await swipeMovie(
+      movieId: event.movieId,
+      isLike: event.isLike,
+      userId: event.userId,
+      rating: event.rating,
+    );
+
+    result.fold(
+      (failure) {
+        print('❌ Swipe error: ${failure.message}');
+      },
+      (_) {
+        print('✅ Swipe saved for movie ${event.movieId}');
+      },
+    );
+  }
+
   Future<void> _onSearchMovies(
     SearchMoviesEvent event,
     Emitter<MoviesState> emit,
@@ -55,27 +103,21 @@ class MoviesBloc extends Bloc<MoviesEvent, MoviesState> {
     );
   }
 
-  Future<void> _onSwipeMovie(
-    SwipeMovieEvent event,
+  Future<void> _onGetRandomMovie(
+    GetRandomMovieEvent event,
     Emitter<MoviesState> emit,
   ) async {
-    final result = await swipeMovie(
-      movieId: event.movieId,
-      isLike: event.isLike,
-      userId: event.userId,
-    );
-
-    result.fold(
-      (failure) {
-        // Show error but don't change the movie list state
-        print('❌ Swipe error: ${failure.message}');
-        // Keep the current state (movies still visible)
-        // The error will be logged but won't interrupt the user experience
-      },
-      (_) {
-        // Swipe successful - keep current state
-        print('✅ Swipe saved for movie ${event.movieId}');
-      },
-    );
+    if (state is MoviesLoaded) {
+      final currentState = state as MoviesLoaded;
+      if (currentState.movies.isNotEmpty) {
+        final random = (DateTime.now().millisecond +
+                DateTime.now().second * 1000) %
+            currentState.movies.length;
+        final selectedMovie = currentState.movies[random];
+        emit(RandomMovieSelected(movie: selectedMovie));
+        // Return to Loaded state immediately so subsequent picks work
+        emit(currentState);
+      }
+    }
   }
 }

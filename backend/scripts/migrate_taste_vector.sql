@@ -17,31 +17,31 @@ ADD COLUMN IF NOT EXISTS like_count_since_update int DEFAULT 0;
 --    division. We unnest → divide each element → re-aggregate.
 -- ============================================================
 CREATE OR REPLACE FUNCTION update_user_taste_vector(user_id_param UUID)
-RETURNS jsonb
+RETURNS TABLE(success boolean, message text, liked_count int)
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
   avg_vec vector(384);
   normalized_vec vector(384);
-  liked_count int;
+  v_liked_count int;
   vec_norm double precision;
 BEGIN
   -- Count liked movies that have embeddings
   SELECT COUNT(*)
-  INTO liked_count
+  INTO v_liked_count
   FROM user_swipes us
   JOIN movies m ON m.id = us.movie_id
   WHERE us.user_id = user_id_param
     AND us.is_like = true
     AND m.embedding IS NOT NULL;
 
-  IF liked_count = 0 THEN
-    RETURN jsonb_build_object(
-      'success', false,
-      'message', 'No liked movies with embeddings found',
-      'liked_count', 0
-    );
+  IF v_liked_count = 0 THEN
+    success := false;
+    message := 'No liked movies with embeddings found';
+    liked_count := 0;
+    RETURN NEXT;
+    RETURN;
   END IF;
 
   -- Compute element-wise average of liked movie embeddings
@@ -57,8 +57,6 @@ BEGIN
   vec_norm := vector_norm(avg_vec);
 
   -- L2-normalize: unnest → divide each element → re-aggregate
-  -- pgvector has no vector/scalar division operator, so we
-  -- decompose to float[], scale, and cast back.
   IF vec_norm > 0 THEN
     SELECT array_agg(val / vec_norm)::real[]::vector(384)
     INTO normalized_vec
@@ -82,11 +80,10 @@ BEGIN
         like_count_since_update = 0;
   END IF;
 
-  RETURN jsonb_build_object(
-    'success', true,
-    'message', 'Taste vector updated',
-    'liked_count', liked_count
-  );
+  success := true;
+  message := 'Taste vector updated';
+  liked_count := v_liked_count;
+  RETURN NEXT;
 END;
 $$;
 

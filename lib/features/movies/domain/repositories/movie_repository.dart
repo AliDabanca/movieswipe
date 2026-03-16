@@ -11,7 +11,7 @@ abstract class MovieRepository {
   Future<Either<Failure, List<Movie>>> getRecommendedMovies();
 
   /// Swipe movie (like/dislike)
-  Future<Either<Failure, void>> swipeMovie(int movieId, bool isLike, String userId);
+  Future<Either<Failure, void>> swipeMovie(int movieId, bool isLike, String userId, {int? rating});
 
   /// Search movies
   Future<Either<Failure, List<Movie>>> searchMovies(String query);

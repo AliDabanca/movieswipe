@@ -304,6 +304,55 @@ class TMDBService:
             "original_language": data.get("original_language"),
         }
     
+    async def get_watch_providers(self, movie_id: int, country: str = "TR") -> Dict[str, Any]:
+        """
+        Fetch watch/streaming providers for a movie from TMDB.
+        
+        Args:
+            movie_id: TMDB Movie ID
+            country: ISO 3166-1 country code (default: TR for Turkey)
+            
+        Returns:
+            Dict with 'providers' list and 'tmdb_link'
+        """
+        try:
+            url = f"{self.BASE_URL}/movie/{movie_id}/watch/providers"
+            params = {"api_key": self.api_key}
+            
+            response = await self.client.get(url, params=params)
+            response.raise_for_status()
+            
+            data = response.json()
+            results = data.get("results", {})
+            country_data = results.get(country, {})
+            
+            # If no data for requested country, try US as fallback
+            if not country_data and country != "US":
+                country_data = results.get("US", {})
+            
+            providers = []
+            tmdb_link = country_data.get("link", "")
+            
+            # Collect all provider types
+            for provider_type in ["flatrate", "rent", "buy"]:
+                for p in country_data.get(provider_type, []):
+                    # Avoid duplicates (same provider can appear in multiple types)
+                    if not any(existing["provider_id"] == p.get("provider_id") for existing in providers):
+                        providers.append({
+                            "provider_id": p.get("provider_id"),
+                            "provider_name": p.get("provider_name", "Unknown"),
+                            "logo_path": p.get("logo_path"),
+                            "provider_type": provider_type,
+                        })
+            
+            return {
+                "providers": providers,
+                "tmdb_link": tmdb_link,
+            }
+            
+        except httpx.HTTPError as e:
+            raise ServerError(f"TMDB watch providers error: {str(e)}")
+    
     @staticmethod
     def _extract_genre_from_details(data: Dict) -> str:
         """Extract primary genre from TMDB details response."""

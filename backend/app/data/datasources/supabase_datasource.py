@@ -121,7 +121,7 @@ class SupabaseDataSource:
             raise ServerError("Failed to fetch movies")
     
     @with_retry()
-    def save_swipe(self, user_id: str, movie_id: int, is_like: bool) -> Dict[str, Any]:
+    def save_swipe(self, user_id: str, movie_id: int, is_like: bool, rating: int | None = None) -> Dict[str, Any]:
         """Save a user swipe to the database."""
         try:
             swipe_data = {
@@ -129,13 +129,15 @@ class SupabaseDataSource:
                 "movie_id": movie_id,
                 "is_like": is_like
             }
+            if is_like and rating is not None:
+                swipe_data["rating"] = rating
             
             # Use upsert to update if exists, insert if not
             response = self.client.table("user_swipes")\
                 .upsert(swipe_data, on_conflict="user_id,movie_id")\
                 .execute()
             
-            logger.info(f"Saved swipe for user {user_id} on movie {movie_id} (like: {is_like})")
+            logger.info(f"Saved swipe for user {user_id} on movie {movie_id} (like: {is_like}, rating: {rating})")
             return response.data[0]
         except Exception as e:
             logger.error(f"Supabase swipe save error: {str(e)}", exc_info=True)
@@ -337,9 +339,9 @@ class SupabaseDataSource:
             if isinstance(data, list) and len(data) > 0:
                 data = data[0]
             
-            if not data:
-                logger.warning(f"⚠️ RPC for user {user_id} returned no data")
-                return {"success": False, "message": "No data returned from RPC"}
+            if not data or not data.get("success"):
+                logger.warning(f"⚠️ RPC for user {user_id} returned failure or no data: {data}")
+                return data if data else {"success": False, "status_message": "No data returned from RPC"}
 
             logger.info(f"🧠 Taste vector RPC success for user {user_id}: {data}")
             return data
@@ -347,7 +349,7 @@ class SupabaseDataSource:
             logger.error(f"❌ Failed to call update_user_taste_vector RPC for user {user_id}: {str(e)}", exc_info=True)
             # We don't necessarily want to crash the whole request if the vector update fails
             # but we should signal it clearly.
-            return {"success": False, "message": str(e)}
+            return {"success": False, "status_message": str(e)}
 
     @with_retry()
     def get_semantic_recommendations(

@@ -13,6 +13,7 @@ class MovieModel(BaseModel):
     overview: str | None = Field(None, description="Movie overview/description")
     release_date: str | None = Field(None, description="Release date")
     vote_average: float | None = Field(None, description="TMDB vote average")
+    user_rating: int | None = Field(None, ge=1, le=5, description="Personal rating (1-5 stars)")
 
     class Config:
         from_attributes = True
@@ -37,6 +38,7 @@ class MovieModel(BaseModel):
             overview=self.overview,
             release_date=self.release_date,
             vote_average=self.vote_average,
+            user_rating=self.user_rating,
         )
 
     @classmethod
@@ -50,6 +52,7 @@ class MovieModel(BaseModel):
             overview=entity.overview,
             release_date=entity.release_date,
             vote_average=entity.vote_average,
+            user_rating=entity.user_rating,
         )
 
 
@@ -76,3 +79,17 @@ class MovieDetailModel(MovieModel):
 
     class Config:
         from_attributes = True
+
+
+class WatchProviderModel(BaseModel):
+    """Single streaming/watch provider."""
+    provider_id: int = Field(..., description="TMDB provider ID")
+    provider_name: str = Field(..., description="Provider name (e.g. Netflix)")
+    logo_path: str | None = Field(None, description="TMDB logo path")
+    provider_type: str = Field(..., description="flatrate, rent, or buy")
+
+
+class WatchProvidersResponse(BaseModel):
+    """Response model for watch providers endpoint."""
+    providers: list[WatchProviderModel] = Field(default_factory=list)
+    tmdb_link: str = Field("", description="TMDB page link for this movie's providers")

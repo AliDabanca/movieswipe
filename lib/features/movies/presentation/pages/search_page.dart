@@ -163,6 +163,7 @@ class _SearchPageState extends State<SearchPage> {
                       movieId: movie.id,
                       isLike: false,
                       userId: userId,
+                      rating: movie.userRating,
                     ),
                   );
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -180,6 +181,7 @@ class _SearchPageState extends State<SearchPage> {
                       movieId: movie.id,
                       isLike: true,
                       userId: userId,
+                      rating: movie.userRating,
                     ),
                   );
                   ScaffoldMessenger.of(context).showSnackBar(

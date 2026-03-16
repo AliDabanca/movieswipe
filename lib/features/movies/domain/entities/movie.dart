@@ -9,6 +9,7 @@ class Movie extends Equatable {
   final String? releaseDate;
   final String? overview;
   final double? voteAverage;
+  final int? userRating;
 
   const Movie({
     required this.id,
@@ -18,10 +19,33 @@ class Movie extends Equatable {
     this.releaseDate,
     this.overview,
     this.voteAverage,
+    this.userRating,
   });
 
+  Movie copyWith({
+    int? id,
+    String? name,
+    String? genre,
+    String? posterPath,
+    String? releaseDate,
+    String? overview,
+    double? voteAverage,
+    int? userRating,
+  }) {
+    return Movie(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      genre: genre ?? this.genre,
+      posterPath: posterPath ?? this.posterPath,
+      releaseDate: releaseDate ?? this.releaseDate,
+      overview: overview ?? this.overview,
+      voteAverage: voteAverage ?? this.voteAverage,
+      userRating: userRating ?? this.userRating,
+    );
+  }
+
   @override
-  List<Object?> get props => [id, name, genre, posterPath, releaseDate, overview, voteAverage];
+  List<Object?> get props => [id, name, genre, posterPath, releaseDate, overview, voteAverage, userRating];
 }
 
 /// Extended movie entity for detail page
@@ -45,6 +69,7 @@ class MovieDetail extends Movie {
     super.releaseDate,
     super.overview,
     super.voteAverage,
+    super.userRating,
     this.genres = const [],
     this.backdropPath,
     this.overviewEn,

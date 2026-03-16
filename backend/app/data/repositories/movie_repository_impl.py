@@ -103,10 +103,10 @@ class MovieRepositoryImpl(MovieRepository):
         saved_data = self.supabase_ds.save_movie(movie_model.model_dump())
         return MovieModel(**saved_data).to_entity()
 
-    async def swipe(self, movie_id: int, is_like: bool, user_id: str) -> None:
+    async def swipe(self, movie_id: int, is_like: bool, user_id: str, rating: int | None = None) -> None:
         """Record a swipe action. Auto-imports movie if missing."""
         try:
-            self.supabase_ds.save_swipe(user_id, movie_id, is_like)
+            self.supabase_ds.save_swipe(user_id, movie_id, is_like, rating)
         except Exception as e:
             # Check if error is related to foreign key constraint (movie_id not found)
             error_str = str(e).lower()
@@ -131,7 +131,7 @@ class MovieRepositoryImpl(MovieRepository):
                     print(f"✅ Auto-imported movie: {tmdb_movie['title']}")
                     
                     # Retry swipe
-                    self.supabase_ds.save_swipe(user_id, movie_id, is_like)
+                    self.supabase_ds.save_swipe(user_id, movie_id, is_like, rating)
                     print(f"✅ Retry swipe successful for movie {movie_id}")
                     return
                 except Exception as import_error:
@@ -142,7 +142,7 @@ class MovieRepositoryImpl(MovieRepository):
             raise e
         
         action = "LIKE" if is_like else "PASS"
-        print(f"✅ Swipe saved to DB: User {user_id} - Movie {movie_id} - {action}")
+        print(f"✅ Swipe saved to DB: User {user_id} - Movie {movie_id} - {action} (Rating: {rating})")
     
     def _extract_genre(self, tmdb_movie: dict) -> str:
         """

@@ -146,6 +146,7 @@ class _SwipePageState extends State<SwipePage> {
                           movieId: movie.id,
                           isLike: isLike,
                           userId: userId,
+                          rating: movie.userRating,
                         ),
                       );
                   return true;

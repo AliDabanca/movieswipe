@@ -78,9 +78,9 @@ class MovieRepositoryImpl implements MovieRepository {
   }
 
   @override
-  Future<Either<Failure, void>> swipeMovie(int movieId, bool isLike, String userId) async {
+  Future<Either<Failure, void>> swipeMovie(int movieId, bool isLike, String userId, {int? rating}) async {
     try {
-      await remoteDataSource.swipeMovie(movieId, isLike, userId);
+      await remoteDataSource.swipeMovie(movieId, isLike, userId, rating: rating);
       return const Right(null);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));

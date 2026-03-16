@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:movieswipe/features/movies/domain/entities/movie.dart';
+import 'package:movieswipe/features/movies/presentation/bloc/movies_bloc.dart';
 import 'package:movieswipe/features/movies/presentation/pages/movie_detail_page.dart';
 
 /// Movie card widget with swipe actions and tap-to-detail navigation
@@ -24,7 +26,10 @@ class MovieCard extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => MovieDetailPage(movie: movie),
+            builder: (_) => BlocProvider.value(
+              value: context.read<MoviesBloc>(),
+              child: MovieDetailPage(movie: movie),
+            ),
           ),
         );
       },

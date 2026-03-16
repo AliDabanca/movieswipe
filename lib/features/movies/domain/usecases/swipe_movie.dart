@@ -12,6 +12,7 @@ class SwipeMovie {
     required int movieId,
     required bool isLike,
     required String userId,
+    int? rating,
   }) async {
     // Retry logic: 3 attempts with exponential backoff
     int attempts = 0;
@@ -20,7 +21,7 @@ class SwipeMovie {
     while (attempts < maxAttempts) {
       attempts++;
       
-      final result = await repository.swipeMovie(movieId, isLike, userId);
+      final result = await repository.swipeMovie(movieId, isLike, userId, rating: rating);
       
       // If successful, return immediately
       if (result.isRight()) {
