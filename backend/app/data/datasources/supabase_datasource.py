@@ -369,3 +369,22 @@ class SupabaseDataSource:
         except Exception as e:
             logger.warning(f"Semantic recommendations RPC failed for user {user_id}: {str(e)}")
             return []
+
+    @with_retry()
+    def update_profile(self, user_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update user profile metadata."""
+        try:
+            response = self.client.table("profiles") \
+                .update(update_data) \
+                .eq("id", user_id) \
+                .execute()
+            
+            if not response.data:
+                raise NotFoundError(f"Profile for user {user_id} not found")
+                
+            return response.data[0]
+        except NotFoundError:
+            raise
+        except Exception as e:
+            logger.error(f"Supabase profile update error for user {user_id}: {str(e)}", exc_info=True)
+            raise ServerError("Failed to update profile")

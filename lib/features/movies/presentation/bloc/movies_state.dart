@@ -15,6 +15,16 @@ class MoviesInitial extends MoviesState {}
 /// Loading state
 class MoviesLoading extends MoviesState {}
 
+/// Refreshing state — keeps existing movies visible while loading new data
+class MoviesRefreshing extends MoviesState {
+  final List<Movie> movies;
+
+  const MoviesRefreshing({required this.movies});
+
+  @override
+  List<Object> get props => [movies];
+}
+
 /// Loaded state
 class MoviesLoaded extends MoviesState {
   final List<Movie> movies;

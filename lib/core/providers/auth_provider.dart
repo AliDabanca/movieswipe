@@ -7,6 +7,9 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = true;
   String? _errorMessage;
   String? _username;
+  String? _displayName;
+  String? _avatarUrl;
+  List<int> _pinnedMovieIds = [];
   bool _hasProfile = false;
   bool _profileChecked = false;
 
@@ -22,6 +25,9 @@ class AuthProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String get userEmail => _user?.email ?? '';
   String? get username => _username;
+  String? get displayName => _displayName;
+  String? get avatarUrl => _avatarUrl;
+  List<int> get pinnedMovieIds => _pinnedMovieIds;
   bool get hasProfile => _hasProfile;
   bool get profileChecked => _profileChecked;
 
@@ -65,16 +71,22 @@ class AuthProvider extends ChangeNotifier {
     try {
       final response = await _client
           .from('profiles')
-          .select('username')
+          .select('username, display_name, avatar_url, pinned_movie_ids')
           .eq('id', _user!.id)
           .maybeSingle();
 
       if (response != null) {
         _username = response['username'] as String?;
+        _displayName = response['display_name'] as String?;
+        _avatarUrl = response['avatar_url'] as String?;
+        _pinnedMovieIds = List<int>.from(response['pinned_movie_ids'] ?? []);
         _hasProfile = _username != null;
       } else {
         _hasProfile = false;
         _username = null;
+        _displayName = null;
+        _avatarUrl = null;
+        _pinnedMovieIds = [];
       }
     } catch (e) {
       debugPrint('Profile check error: $e');
@@ -235,6 +247,44 @@ class AuthProvider extends ChangeNotifier {
     _username = null;
     _hasProfile = false;
     notifyListeners();
+  }
+
+  /// Update user profile directly via Supabase
+  Future<bool> updateProfile({
+    String? username,
+    String? displayName,
+    String? avatarUrl,
+    List<int>? pinnedMovieIds,
+  }) async {
+    if (_user == null) return false;
+
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final updateData = <String, dynamic>{};
+      if (username != null) updateData['username'] = username;
+      if (displayName != null) updateData['display_name'] = displayName;
+      if (avatarUrl != null) updateData['avatar_url'] = avatarUrl;
+      if (pinnedMovieIds != null) updateData['pinned_movie_ids'] = pinnedMovieIds;
+
+      if (updateData.isEmpty) return true;
+
+      await _client.from('profiles').update(updateData).eq('id', _user!.id);
+
+      // Update local state
+      if (username != null) _username = username;
+      if (displayName != null) _displayName = displayName;
+      if (avatarUrl != null) _avatarUrl = avatarUrl;
+      if (pinnedMovieIds != null) _pinnedMovieIds = pinnedMovieIds;
+
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Profil güncellenemedi: $e';
+      notifyListeners();
+      return false;
+    }
   }
 
   /// Clear error message

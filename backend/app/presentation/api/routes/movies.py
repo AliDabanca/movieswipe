@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from typing import List
+import asyncio
 
 from app.domain.repositories.movie_repository import MovieRepository
 from app.data.models.movie_model import MovieModel, MovieDetailModel, WatchProviderModel, WatchProvidersResponse
@@ -77,40 +78,36 @@ async def get_movie_details(
 ):
     """
     Get enriched movie details with credits, TR/EN overview, and similar movies.
-    Also includes the user's personal rating if available.
+    Uses asyncio.gather for concurrent data fetching.
     """
     tmdb = TMDBService()
     ds = SupabaseDataSource()
-    
-    # Try to get user's existing rating
-    user_rating = None
-    try:
-        swipe = ds.client.table("user_swipes") \
-            .select("rating") \
-            .eq("user_id", user_id) \
-            .eq("movie_id", movie_id) \
-            .maybe_single() \
-            .execute()
-        if swipe.data:
-            user_rating = swipe.data.get("rating")
-    except Exception as e:
-        logger.warning(f"Failed to fetch user rating for movie {movie_id}: {e}")
 
-    try:
-        enriched = None
+    # ── Helper coroutines for concurrent execution ────────────────
+    async def _fetch_user_rating() -> int | None:
         try:
-            # Fetch enriched details from TMDB
-            enriched = await tmdb.get_movie_details_enriched(movie_id)
-            # Add the user's rating to the enriched data
-            if enriched:
-                enriched["user_rating"] = user_rating
+            swipe = ds.client.table("user_swipes") \
+                .select("rating") \
+                .eq("user_id", user_id) \
+                .eq("movie_id", movie_id) \
+                .maybe_single() \
+                .execute()
+            if swipe and swipe.data:
+                return swipe.data.get("rating")
+        except Exception as e:
+            logger.warning(f"Failed to fetch user rating for movie {movie_id}: {e}")
+        return None
+
+    async def _fetch_enriched() -> dict | None:
+        try:
+            return await tmdb.get_movie_details_enriched(movie_id)
         except Exception as tmdb_error:
             logger.warning(f"TMDB details unavailable for {movie_id}: {tmdb_error}")
-            # Fallback: Try to get basic info from our DB
-            ds = SupabaseDataSource()
+            # Fallback: basic info from our DB
             try:
-                local_movie = ds.get_movie_by_id(movie_id)
-                enriched = {
+                local_ds = SupabaseDataSource()
+                local_movie = local_ds.get_movie_by_id(movie_id)
+                return {
                     "id": local_movie["id"],
                     "name": local_movie.get("name", "Unknown"),
                     "genre": local_movie.get("genre", "General"),
@@ -118,8 +115,6 @@ async def get_movie_details(
                     "overview": local_movie.get("overview", "Detaylar şu an ulaşılamıyor."),
                     "release_date": local_movie.get("release_date"),
                     "vote_average": local_movie.get("vote_average", 0),
-                    "user_rating": user_rating,
-                    # Fill missing fields with defaults
                     "genres": [local_movie.get("genre", "General")],
                     "backdrop_path": None,
                     "overview_en": local_movie.get("overview", ""),
@@ -132,17 +127,13 @@ async def get_movie_details(
                 }
             except Exception as db_error:
                 logger.error(f"Critical DB fallback failure for movie {movie_id}: {db_error}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to fetch movie details",
-                )
+                return None
 
-        # Try to get similar movies via vector search
-        similar_movies = []
+    async def _fetch_similar() -> list:
         try:
-            ds = SupabaseDataSource()
-            similar_raw = ds.get_similar_movies(movie_id, limit=3)
-            similar_movies = [
+            similar_ds = SupabaseDataSource()
+            similar_raw = similar_ds.get_similar_movies(movie_id, limit=3)
+            return [
                 MovieModel(
                     id=m["id"],
                     name=m.get("name", "Unknown"),
@@ -156,7 +147,24 @@ async def get_movie_details(
             ]
         except Exception as e:
             logger.warning(f"Similar movies unavailable for movie {movie_id}: {e}")
-        
+            return []
+
+    # ── Execute ALL tasks concurrently ────────────────────────────
+    try:
+        user_rating, enriched, similar_movies = await asyncio.gather(
+            _fetch_user_rating(),
+            _fetch_enriched(),
+            _fetch_similar(),
+        )
+
+        if enriched is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to fetch movie details",
+            )
+
+        enriched["user_rating"] = user_rating
+
         return MovieDetailModel(
             id=enriched["id"],
             name=enriched["name"],

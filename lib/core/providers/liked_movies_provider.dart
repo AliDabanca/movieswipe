@@ -53,6 +53,56 @@ class LikedMoviesProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   SortCriteria get currentSortCriteria => _currentSortCriteria;
 
+  /// Dynamic title based on top genre
+  String get movieDnaTitle {
+    if (_totalLikes < 10) return 'Yeni İzleyici';
+    if (_topGenres.isEmpty) return 'Keşifçi';
+    
+    final topGenre = _topGenres[0][0] as String;
+    switch (topGenre) {
+      case 'Action': return 'Aksiyon Tutkunu';
+      case 'Comedy': return 'Kahkaha Avcısı';
+      case 'Drama': return 'Drama Eleştirmeni';
+      case 'Horror': return 'Korkusuz İzleyici';
+      case 'Sci-Fi': 
+      case 'Science Fiction': return 'Bilimkurgu Gezgini';
+      case 'Romance': return 'Romantik Ruh';
+      case 'Animation': return 'Animasyon Sever';
+      case 'Documentary': return 'Bilgi Küpü';
+      case 'Thriller': return 'Gerilim Avcısı';
+      case 'Fantasy': return 'Hayalperest';
+      default: return 'Film Gurmesi';
+    }
+  }
+
+  /// List of unlocked achievements
+  List<Map<String, dynamic>> get achievements {
+    final list = <Map<String, dynamic>>[];
+    
+    if (_totalSwipes > 0) {
+      list.add({'id': 'first_swipe', 'title': 'İlk Adım', 'icon': '🎯'});
+    }
+    if (_totalLikes >= 10) {
+      list.add({'id': 'like_10', 'title': 'Zevk Sahibi', 'icon': '⭐'});
+    }
+    if (_totalLikes >= 50) {
+      list.add({'id': 'like_50', 'title': 'Film Kurdu', 'icon': '🎬'});
+    }
+    if (_totalPasses >= 50) {
+      list.add({'id': 'pass_50', 'title': 'Zor Beğenen', 'icon': '🧐'});
+    }
+    
+    // Genre specific
+    for (final genre in _topGenres) {
+      if ((genre[1] as num) > 0.4 && _totalLikes > 20) {
+        list.add({'id': 'genre_master', 'title': '${genre[0]} Ustası', 'icon': '🏆'});
+        break; 
+      }
+    }
+    
+    return list;
+  }
+
   void setSortCriteria(SortCriteria criteria) {
     if (_currentSortCriteria != criteria) {
       _currentSortCriteria = criteria;

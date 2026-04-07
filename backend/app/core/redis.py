@@ -16,6 +16,8 @@ async def get_redis_client() -> redis.Redis:
             f"redis://{settings.redis_host}:{settings.redis_port}/{settings.redis_db}",
             encoding="utf-8",
             decode_responses=True,
+            socket_connect_timeout=1,   # 1 second to connect
+            socket_timeout=1,           # 1 second per operation
         )
     return redis_client
 
@@ -26,3 +28,4 @@ async def close_redis():
     if redis_client:
         await redis_client.close()
         redis_client = None
+

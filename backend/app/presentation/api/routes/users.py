@@ -4,27 +4,70 @@ from app.services.recommendation_service import RecommendationService
 from app.services.embedding_service import embedding_service
 from app.core.auth import get_current_user_id
 from app.core.logger import logger
+from app.data.models.user_model import UserProfileUpdate
+from app.data.datasources.supabase_datasource import SupabaseDataSource
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-# Initialize service
+# Initialize services
 recommendation_service = RecommendationService()
+supabase_ds = SupabaseDataSource()
 
 
 @router.get("/me/profile")
 async def get_my_profile(user_id: str = Depends(get_current_user_id)):
     """
-    Get the current user's profile with preferences.
-    User ID comes from JWT token.
+    Get the current user's profile with stats and preferences.
     """
     try:
+        # Get basic profile info from Supabase
+        profile_data = supabase_ds.client.table("profiles").select("*").eq("id", user_id).single().execute()
+        
+        # Get recommendation stats
         stats = recommendation_service.get_user_stats(user_id)
-        return stats
+        
+        # Merge them
+        result = {**stats}
+        if profile_data.data:
+            result.update({
+                "display_name": profile_data.data.get("display_name"),
+                "avatar_url": profile_data.data.get("avatar_url"),
+                "username": profile_data.data.get("username"),
+                "pinned_movie_ids": profile_data.data.get("pinned_movie_ids", [])
+            })
+        return result
     except Exception as e:
         logger.error(f"Failed to fetch profile for user {user_id}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch user profile",
+        )
+
+
+@router.patch("/me")
+async def update_my_profile(
+    profile_update: UserProfileUpdate,
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Update the current user's profile information.
+    """
+    try:
+        # Filter out None values to only update provided fields
+        update_dict = profile_update.dict(exclude_none=True)
+        if not update_dict:
+            return {"message": "No changes provided"}
+            
+        updated_profile = supabase_ds.update_profile(user_id, update_dict)
+        return {
+            "message": "Profile updated successfully",
+            "profile": updated_profile
+        }
+    except Exception as e:
+        logger.error(f"Failed to update profile for user {user_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update profile",
         )
 
 

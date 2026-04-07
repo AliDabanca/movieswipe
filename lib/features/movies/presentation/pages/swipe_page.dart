@@ -33,6 +33,9 @@ class _SwipePageState extends State<SwipePage> {
       builder: (context, state) {
         if (state is MoviesLoading || state is MoviesInitial) {
           return _buildLoadingSkeleton(context);
+        } else if (state is MoviesRefreshing) {
+          // Show existing cards while refreshing — no jarring loading screen
+          return _buildSwipeCards(context, state.movies);
         } else if (state is MoviesEndOfContent) {
           return _buildEndOfContent(context, state.message);
         } else if (state is MoviesLoaded) {

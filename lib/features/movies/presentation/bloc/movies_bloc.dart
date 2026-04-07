@@ -54,7 +54,12 @@ class MoviesBloc extends Bloc<MoviesEvent, MoviesState> {
     LoadMoviesEvent event,
     Emitter<MoviesState> emit,
   ) async {
-    emit(MoviesLoading());
+    // If movies are already loaded, show them while refreshing in background
+    if (state is MoviesLoaded) {
+      emit(MoviesRefreshing(movies: (state as MoviesLoaded).movies));
+    } else {
+      emit(MoviesLoading());
+    }
 
     try {
       final result = await getRecommendedMovies();

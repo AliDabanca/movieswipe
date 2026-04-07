@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:get_it/get_it.dart';
 import 'package:movieswipe/features/movies/domain/entities/movie.dart';
 import 'package:movieswipe/features/movies/data/models/movie_model.dart';
 import 'package:movieswipe/features/movies/data/datasources/movie_remote_datasource.dart';
@@ -42,23 +43,19 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
   Future<void> _loadDetails() async {
     try {
-      final apiClient = ApiClient();
+      final apiClient = GetIt.instance<ApiClient>();
       final datasource = MovieRemoteDataSourceImpl(apiClient: apiClient);
 
-      final detail = await datasource.getMovieDetails(widget.movie.id);
-      
-      // Fetch watch providers concurrently/silently
-      Map<String, dynamic>? providersData;
-      try {
-        providersData = await apiClient.get('/movies/${widget.movie.id}/watch-providers') as Map<String, dynamic>?;
-      } catch (e) {
-        // Ignore watch provider errors so it doesn't break the page
-      }
+      // Fetch movie details and watch providers concurrently
+      final results = await Future.wait([
+        datasource.getMovieDetails(widget.movie.id),
+        apiClient.get('/movies/${widget.movie.id}/watch-providers').catchError((_) => null),
+      ]);
 
       if (mounted) {
         setState(() {
-          _detail = detail;
-          _watchProvidersData = providersData;
+          _detail = results[0] as MovieDetailModel;
+          _watchProvidersData = results[1] as Map<String, dynamic>?;
           _isLoading = false;
         });
       }
@@ -207,15 +204,19 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                   const SizedBox(height: 24),
                   _buildCastSection(d.castDetails),
                 ],
-                if (d.similarMovies.isNotEmpty) ...[
-                  const SizedBox(height: 28),
-                  _buildSimilarMovies(d.similarMovies),
-                ],
-                const SizedBox(height: 40),
               ],
             ),
           ),
         ),
+        // Similar Movies - separate sliver so it can center properly
+        if (d.similarMovies.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _buildSimilarMovies(d.similarMovies),
+            ),
+          ),
+        const SliverToBoxAdapter(child: SizedBox(height: 40)),
       ],
     );
   }
@@ -686,8 +687,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
   Widget _buildSimilarMovies(List<MovieModel> movies) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const SizedBox(height: 28),
         const Text(
           'Benzer Filmler',
           style: TextStyle(
@@ -696,19 +697,26 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 200,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: movies.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final movie = movies[index];
-              return _buildSimilarMovieCard(movie);
-            },
-          ),
-        ),
+        const SizedBox(height: 16),
+        movies.length > 4
+            ? SizedBox(
+                height: 200,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: movies.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) {
+                    final movie = movies[index];
+                    return _buildSimilarMovieCard(movie);
+                  },
+                ),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children:
+                    movies.map((m) => _buildSimilarMovieCard(m)).toList(),
+              ),
       ],
     );
   }

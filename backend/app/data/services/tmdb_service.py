@@ -1,9 +1,20 @@
-"""TMDB API Service for fetching movie data."""
+"""TMDB API Service for fetching movie data with Redis caching."""
 
+import json
+import asyncio
 import httpx
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.core.config import settings
 from app.core.errors import ServerError
+from app.core.redis import get_redis_client
+from app.core.logger import logger
+
+
+# Cache TTL constants (seconds)
+CACHE_TTL_LIST = 3600         # 1 hour for list endpoints (popular, trending, etc.)
+CACHE_TTL_DETAILS = 86400     # 24 hours for movie details
+CACHE_TTL_SEARCH = 1800       # 30 minutes for search results
+CACHE_TTL_PROVIDERS = 86400   # 24 hours for watch providers
 
 
 class TMDBService:
@@ -19,196 +30,158 @@ class TMDBService:
     async def close(self):
         """Close HTTP client."""
         await self.client.aclose()
-    
+
+    # ── Cache helpers ─────────────────────────────────────────────────
+    _redis_available: bool = True  # fail-fast flag
+
+    async def _cache_get(self, key: str) -> Optional[Any]:
+        """Get a value from Redis cache. Returns None on miss or error."""
+        if not TMDBService._redis_available:
+            return None
+        try:
+            rc = await get_redis_client()
+            cached = await rc.get(key)
+            if cached:
+                return json.loads(cached)
+        except Exception as e:
+            TMDBService._redis_available = False
+            logger.warning(f"Redis unavailable, disabling cache: {e}")
+        return None
+
+    async def _cache_set(self, key: str, value: Any, ttl: int) -> None:
+        """Set a value in Redis cache with TTL. Silently ignores errors."""
+        if not TMDBService._redis_available:
+            return
+        try:
+            rc = await get_redis_client()
+            await rc.set(key, json.dumps(value), ex=ttl)
+        except Exception as e:
+            TMDBService._redis_available = False
+            logger.warning(f"Redis unavailable, disabling cache: {e}")
+
+    # ── List endpoints (with caching) ─────────────────────────────────
     async def get_popular_movies(self, page: int = 1) -> List[Dict[str, Any]]:
-        """
-        Fetch popular movies from TMDB.
-        
-        Args:
-            page: Page number for pagination
-            
-        Returns:
-            List of movie data dictionaries
-        """
+        """Fetch popular movies from TMDB (cached 1h)."""
+        cache_key = f"tmdb:popular:{page}"
+        cached = await self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
         try:
             url = f"{self.BASE_URL}/movie/popular"
-            params = {
-                "api_key": self.api_key,
-                "language": "en-US",
-                "page": page
-            }
-            
+            params = {"api_key": self.api_key, "language": "en-US", "page": page}
             response = await self.client.get(url, params=params)
             response.raise_for_status()
-            
-            data = response.json()
-            return data.get("results", [])
-            
+            results = response.json().get("results", [])
+            await self._cache_set(cache_key, results, CACHE_TTL_LIST)
+            return results
         except httpx.HTTPError as e:
             raise ServerError(f"TMDB API error: {str(e)}")
     
     def get_poster_url(self, poster_path: str | None) -> str | None:
-        """
-        Get full poster URL from TMDB poster path.
-        
-        Args:
-            poster_path: TMDB poster path (e.g., "/abc123.jpg")
-            
-        Returns:
-            Full poster URL or None
-        """
+        """Get full poster URL from TMDB poster path."""
         if not poster_path:
             return None
         return f"{self.IMAGE_BASE_URL}{poster_path}"
     
     async def search_movies(self, query: str, page: int = 1) -> List[Dict[str, Any]]:
-        """
-        Search for movies by title.
-        
-        Args:
-            query: Search query
-            page: Page number
-            
-        Returns:
-            List of movie data dictionaries
-        """
+        """Search for movies by title (cached 30m)."""
+        cache_key = f"tmdb:search:{query.lower().strip()}:{page}"
+        cached = await self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
         try:
             url = f"{self.BASE_URL}/search/movie"
-            params = {
-                "api_key": self.api_key,
-                "language": "en-US",
-                "query": query,
-                "page": page
-            }
-            
+            params = {"api_key": self.api_key, "language": "en-US", "query": query, "page": page}
             response = await self.client.get(url, params=params)
             response.raise_for_status()
-            
-            data = response.json()
-            return data.get("results", [])
-            
+            results = response.json().get("results", [])
+            await self._cache_set(cache_key, results, CACHE_TTL_SEARCH)
+            return results
         except httpx.HTTPError as e:
             raise ServerError(f"TMDB search error: {str(e)}")
     
     async def get_now_playing(self, page: int = 1) -> List[Dict[str, Any]]:
-        """
-        Fetch movies currently in theaters.
-        
-        Args:
-            page: Page number for pagination
-            
-        Returns:
-            List of movie data dictionaries
-        """
+        """Fetch movies currently in theaters (cached 1h)."""
+        cache_key = f"tmdb:now_playing:{page}"
+        cached = await self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
         try:
             url = f"{self.BASE_URL}/movie/now_playing"
-            params = {
-                "api_key": self.api_key,
-                "language": "en-US",
-                "page": page
-            }
-            
+            params = {"api_key": self.api_key, "language": "en-US", "page": page}
             response = await self.client.get(url, params=params)
             response.raise_for_status()
-            
-            data = response.json()
-            return data.get("results", [])
-            
+            results = response.json().get("results", [])
+            await self._cache_set(cache_key, results, CACHE_TTL_LIST)
+            return results
         except httpx.HTTPError as e:
             raise ServerError(f"TMDB now playing error: {str(e)}")
     
     async def get_upcoming(self, page: int = 1) -> List[Dict[str, Any]]:
-        """
-        Fetch upcoming movies.
-        
-        Args:
-            page: Page number for pagination
-            
-        Returns:
-            List of movie data dictionaries
-        """
+        """Fetch upcoming movies (cached 1h)."""
+        cache_key = f"tmdb:upcoming:{page}"
+        cached = await self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
         try:
             url = f"{self.BASE_URL}/movie/upcoming"
-            params = {
-                "api_key": self.api_key,
-                "language": "en-US",
-                "page": page
-            }
-            
+            params = {"api_key": self.api_key, "language": "en-US", "page": page}
             response = await self.client.get(url, params=params)
             response.raise_for_status()
-            
-            data = response.json()
-            return data.get("results", [])
-            
+            results = response.json().get("results", [])
+            await self._cache_set(cache_key, results, CACHE_TTL_LIST)
+            return results
         except httpx.HTTPError as e:
             raise ServerError(f"TMDB upcoming error: {str(e)}")
 
     async def get_top_rated(self, page: int = 1) -> List[Dict[str, Any]]:
-        """
-        Fetch top rated movies from TMDB.
-        
-        Args:
-            page: Page number for pagination
-            
-        Returns:
-            List of movie data dictionaries
-        """
+        """Fetch top rated movies from TMDB (cached 1h)."""
+        cache_key = f"tmdb:top_rated:{page}"
+        cached = await self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
         try:
             url = f"{self.BASE_URL}/movie/top_rated"
-            params = {
-                "api_key": self.api_key,
-                "language": "en-US",
-                "page": page
-            }
-            
+            params = {"api_key": self.api_key, "language": "en-US", "page": page}
             response = await self.client.get(url, params=params)
             response.raise_for_status()
-            
-            data = response.json()
-            return data.get("results", [])
-            
+            results = response.json().get("results", [])
+            await self._cache_set(cache_key, results, CACHE_TTL_LIST)
+            return results
         except httpx.HTTPError as e:
             raise ServerError(f"TMDB top rated error: {str(e)}")
 
     async def get_trending(self, page: int = 1) -> List[Dict[str, Any]]:
-        """
-        Fetch trending movies this week from TMDB.
-        
-        Args:
-            page: Page number for pagination
-            
-        Returns:
-            List of movie data dictionaries
-        """
+        """Fetch trending movies this week from TMDB (cached 1h)."""
+        cache_key = f"tmdb:trending:{page}"
+        cached = await self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
         try:
             url = f"{self.BASE_URL}/trending/movie/week"
-            params = {
-                "api_key": self.api_key,
-                "language": "en-US",
-                "page": page
-            }
-            
+            params = {"api_key": self.api_key, "language": "en-US", "page": page}
             response = await self.client.get(url, params=params)
             response.raise_for_status()
-            
-            data = response.json()
-            return data.get("results", [])
-            
+            results = response.json().get("results", [])
+            await self._cache_set(cache_key, results, CACHE_TTL_LIST)
+            return results
         except httpx.HTTPError as e:
             raise ServerError(f"TMDB trending error: {str(e)}")
 
+    # ── Detail endpoints (with caching) ───────────────────────────────
     async def get_movie_details(self, movie_id: int, language: str = "en-US") -> Dict[str, Any]:
-        """
-        Fetch details for a specific movie with credits.
-        
-        Args:
-            movie_id: TMDB Movie ID
-            language: Language code for localization
-            
-        Returns:
-            Movie data dictionary with credits
-        """
+        """Fetch details for a specific movie with credits (cached 24h)."""
+        cache_key = f"tmdb:details:{movie_id}:{language}"
+        cached = await self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
         try:
             url = f"{self.BASE_URL}/movie/{movie_id}"
             params = {
@@ -216,54 +189,44 @@ class TMDBService:
                 "language": language,
                 "append_to_response": "credits"
             }
-            
             response = await self.client.get(url, params=params)
             response.raise_for_status()
-            
-            return response.json()
-            
+            data = response.json()
+            await self._cache_set(cache_key, data, CACHE_TTL_DETAILS)
+            return data
         except httpx.HTTPError as e:
             if hasattr(e, "response") and e.response.status_code == 404:
                 raise ServerError(f"Movie {movie_id} not found in TMDB")
-            print(f"❌ TMDB API connection error for movie {movie_id}: {str(e)}")
+            logger.error(f"TMDB API connection error for movie {movie_id}: {str(e)}")
             raise ServerError(f"TMDB details error: {str(e)}")
 
     async def get_movie_details_enriched(self, movie_id: int) -> Dict[str, Any]:
         """
         Fetch enriched movie details with TR/EN fallback and extracted credits.
-        
-        Strategy:
-            1. Fetch with language=tr-TR (includes credits)
-            2. If Turkish overview is empty, fetch EN overview separately
-            3. Extract director from crew, top 5 cast
-        
-        Returns:
-            Enriched movie dict with: director, cast, overview_tr, runtime, tagline
+        Uses asyncio.gather to fetch TR and EN details concurrently.
         """
-        # Step 1: Fetch in Turkish (with credits)
-        data = await self.get_movie_details(movie_id, language="tr-TR")
+        # Fetch TR and EN details concurrently
+        tr_task = self.get_movie_details(movie_id, language="tr-TR")
+        en_task = self.get_movie_details(movie_id, language="en-US")
+
+        results = await asyncio.gather(tr_task, en_task, return_exceptions=True)
         
+        data = results[0] if not isinstance(results[0], Exception) else None
+        en_data = results[1] if not isinstance(results[1], Exception) else None
+
+        if data is None:
+            if en_data is None:
+                raise ServerError(f"Failed to fetch details for movie {movie_id}")
+            data = en_data
+
         overview_tr = data.get("overview", "")
-        overview_en = ""
+        overview_en = en_data.get("overview", "") if en_data else ""
         
-        # Step 2: If Turkish overview empty, get English
+        # If Turkish overview empty, use English as fallback
         if not overview_tr or len(overview_tr.strip()) == 0:
-            try:
-                en_data = await self.get_movie_details(movie_id, language="en-US")
-                overview_en = en_data.get("overview", "")
-                # Also use EN overview as fallback
-                overview_tr = overview_en
-            except Exception:
-                pass
-        else:
-            # Still fetch EN for potential use
-            try:
-                en_data = await self.get_movie_details(movie_id, language="en-US")
-                overview_en = en_data.get("overview", "")
-            except Exception:
-                overview_en = overview_tr
+            overview_tr = overview_en
         
-        # Step 3: Extract director from credits.crew
+        # Extract director from credits.crew
         director = None
         credits = data.get("credits", {})
         crew = credits.get("crew", [])
@@ -272,7 +235,7 @@ class TMDBService:
                 director = member.get("name")
                 break
         
-        # Step 4: Extract top 5 cast
+        # Extract top 5 cast
         cast_list = credits.get("cast", [])
         cast_names = [actor.get("name", "") for actor in cast_list[:5]]
         cast_profiles = [
@@ -305,20 +268,15 @@ class TMDBService:
         }
     
     async def get_watch_providers(self, movie_id: int, country: str = "TR") -> Dict[str, Any]:
-        """
-        Fetch watch/streaming providers for a movie from TMDB.
-        
-        Args:
-            movie_id: TMDB Movie ID
-            country: ISO 3166-1 country code (default: TR for Turkey)
-            
-        Returns:
-            Dict with 'providers' list and 'tmdb_link'
-        """
+        """Fetch watch/streaming providers for a movie from TMDB (cached 24h)."""
+        cache_key = f"tmdb:providers:{movie_id}:{country}"
+        cached = await self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
         try:
             url = f"{self.BASE_URL}/movie/{movie_id}/watch/providers"
             params = {"api_key": self.api_key}
-            
             response = await self.client.get(url, params=params)
             response.raise_for_status()
             
@@ -326,17 +284,14 @@ class TMDBService:
             results = data.get("results", {})
             country_data = results.get(country, {})
             
-            # If no data for requested country, try US as fallback
             if not country_data and country != "US":
                 country_data = results.get("US", {})
             
             providers = []
             tmdb_link = country_data.get("link", "")
             
-            # Collect all provider types
             for provider_type in ["flatrate", "rent", "buy"]:
                 for p in country_data.get(provider_type, []):
-                    # Avoid duplicates (same provider can appear in multiple types)
                     if not any(existing["provider_id"] == p.get("provider_id") for existing in providers):
                         providers.append({
                             "provider_id": p.get("provider_id"),
@@ -345,10 +300,9 @@ class TMDBService:
                             "provider_type": provider_type,
                         })
             
-            return {
-                "providers": providers,
-                "tmdb_link": tmdb_link,
-            }
+            result = {"providers": providers, "tmdb_link": tmdb_link}
+            await self._cache_set(cache_key, result, CACHE_TTL_PROVIDERS)
+            return result
             
         except httpx.HTTPError as e:
             raise ServerError(f"TMDB watch providers error: {str(e)}")
