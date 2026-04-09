@@ -20,6 +20,7 @@ class LikedMoviesProvider extends ChangeNotifier {
   // Cache keys
   static const _cacheKeyMovies = 'cached_liked_movies';
   static const _cacheKeyStats = 'cached_user_stats';
+  static const _cacheKeyMood = 'cached_mood_history';
 
   // Liked movies structured data
   List<Map<String, dynamic>> _recentlyAddedAll = [];
@@ -30,6 +31,11 @@ class LikedMoviesProvider extends ChangeNotifier {
   int _totalLikes = 0;
   int _totalPasses = 0;
   List<dynamic> _topGenres = [];
+
+  // Mood
+  List<Map<String, dynamic>> _moodHistory = [];
+  String? _currentMood;
+  String? _currentEmoji;
 
   // Sorting
   SortCriteria _currentSortCriteria = SortCriteria.recentlyAdded;
@@ -49,6 +55,9 @@ class LikedMoviesProvider extends ChangeNotifier {
   int get totalPasses => _totalPasses;
   double get likeRatio => _totalSwipes > 0 ? _totalLikes / _totalSwipes : 0.0;
   List<dynamic> get topGenres => _topGenres;
+  List<Map<String, dynamic>> get moodHistory => _moodHistory;
+  String? get currentMood => _currentMood;
+  String? get currentEmoji => _currentEmoji;
   bool get isLoaded => _isLoaded;
   bool get isLoading => _isLoading;
   SortCriteria get currentSortCriteria => _currentSortCriteria;
@@ -75,32 +84,101 @@ class LikedMoviesProvider extends ChangeNotifier {
     }
   }
 
-  /// List of unlocked achievements
+  /// List of ALL achievements with unlock status
   List<Map<String, dynamic>> get achievements {
-    final list = <Map<String, dynamic>>[];
-    
-    if (_totalSwipes > 0) {
-      list.add({'id': 'first_swipe', 'title': 'İlk Adım', 'icon': '🎯'});
-    }
-    if (_totalLikes >= 10) {
-      list.add({'id': 'like_10', 'title': 'Zevk Sahibi', 'icon': '⭐'});
-    }
-    if (_totalLikes >= 50) {
-      list.add({'id': 'like_50', 'title': 'Film Kurdu', 'icon': '🎬'});
-    }
-    if (_totalPasses >= 50) {
-      list.add({'id': 'pass_50', 'title': 'Zor Beğenen', 'icon': '🧐'});
-    }
-    
-    // Genre specific
+    // Check genre master
+    String? genreMasterName;
     for (final genre in _topGenres) {
       if ((genre[1] as num) > 0.4 && _totalLikes > 20) {
-        list.add({'id': 'genre_master', 'title': '${genre[0]} Ustası', 'icon': '🏆'});
-        break; 
+        genreMasterName = genre[0] as String;
+        break;
       }
     }
-    
-    return list;
+
+    // Check if user has rated any movie 5 stars
+    bool hasGivenFiveStars = false;
+    for (final movies in _moviesByGenre.values) {
+      for (final m in movies) {
+        if ((m['user_rating'] as int?) == 5) {
+          hasGivenFiveStars = true;
+          break;
+        }
+      }
+      if (hasGivenFiveStars) break;
+    }
+
+    return [
+      {
+        'id': 'first_swipe',
+        'title': 'İlk Adım',
+        'icon': '🎯',
+        'description': 'İlk swipe\'ını yap',
+        'isUnlocked': _totalSwipes > 0,
+      },
+      {
+        'id': 'like_10',
+        'title': 'Zevk Sahibi',
+        'icon': '⭐',
+        'description': '10 film beğen',
+        'isUnlocked': _totalLikes >= 10,
+      },
+      {
+        'id': 'like_50',
+        'title': 'Film Kurdu',
+        'icon': '🎬',
+        'description': '50 film beğen',
+        'isUnlocked': _totalLikes >= 50,
+      },
+      {
+        'id': 'pass_50',
+        'title': 'Seçici Ruh',
+        'icon': '🧐',
+        'description': '50 film geç',
+        'isUnlocked': _totalPasses >= 50,
+      },
+      {
+        'id': 'diverse_taste',
+        'title': 'Gurme',
+        'icon': '🌍',
+        'description': '5 farklı türden film beğen',
+        'isUnlocked': _moviesByGenre.keys.length >= 5,
+      },
+      {
+        'id': 'marathon',
+        'title': 'Maratoncu',
+        'icon': '🏃',
+        'description': '100 swipe yap',
+        'isUnlocked': _totalSwipes >= 100,
+      },
+      {
+        'id': 'picky_eater',
+        'title': 'Zor Beğenen',
+        'icon': '🍷',
+        'description': 'Beğeni oranı %30 altında (min 20 swipe)',
+        'isUnlocked': _totalSwipes >= 20 && likeRatio < 0.3,
+      },
+      {
+        'id': 'perfect_match',
+        'title': 'Her Şeyi Sever',
+        'icon': '💖',
+        'description': 'Beğeni oranı %70 üstünde (min 20 swipe)',
+        'isUnlocked': _totalSwipes >= 20 && likeRatio > 0.7,
+      },
+      {
+        'id': 'critic',
+        'title': 'Eleştirmen',
+        'icon': '📝',
+        'description': 'Bir filme 5 yıldız ver',
+        'isUnlocked': hasGivenFiveStars,
+      },
+      {
+        'id': 'genre_master',
+        'title': genreMasterName != null ? '$genreMasterName Ustası' : 'Tür Ustası',
+        'icon': '🏆',
+        'description': 'Bir türde %40+ beğeni oranına ulaş',
+        'isUnlocked': genreMasterName != null,
+      },
+    ];
   }
 
   void setSortCriteria(SortCriteria criteria) {
@@ -151,6 +229,7 @@ class LikedMoviesProvider extends ChangeNotifier {
       final results = await Future.wait([
         _apiClient.get('/users/me/liked-movies'),
         _apiClient.get('/users/me/stats'),
+        _apiClient.get('/users/me/mood-history'),
       ]);
 
       // Parse liked movies
@@ -174,6 +253,14 @@ class LikedMoviesProvider extends ChangeNotifier {
       _totalPasses = stats['total_passes'] ?? 0;
       _topGenres = stats['top_genres'] as List? ?? [];
 
+      // Parse mood
+      final moodRes = results[2] as Map<String, dynamic>;
+      _moodHistory = (moodRes['mood_history'] as List? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      _currentMood = moodRes['current_mood'] as String?;
+      _currentEmoji = moodRes['current_emoji'] as String?;
+
       _isLoaded = true;
 
       // Save to cache for next startup
@@ -193,6 +280,7 @@ class LikedMoviesProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final moviesJson = prefs.getString('${_cacheKeyMovies}_$userId');
       final statsJson = prefs.getString('${_cacheKeyStats}_$userId');
+      final moodJson = prefs.getString('${_cacheKeyMood}_$userId');
 
       if (moviesJson != null && statsJson != null) {
         // Parse cached movies
@@ -223,6 +311,16 @@ class LikedMoviesProvider extends ChangeNotifier {
         _totalPasses = stats['total_passes'] ?? 0;
         _topGenres = stats['top_genres'] as List? ?? [];
 
+        // Parse cached mood
+        if (moodJson != null) {
+          final moodData = jsonDecode(moodJson) as Map<String, dynamic>;
+          _moodHistory = (moodData['mood_history'] as List? ?? [])
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+          _currentMood = moodData['current_mood'] as String?;
+          _currentEmoji = moodData['current_emoji'] as String?;
+        }
+
         _isLoaded = true;
         print('⚡ Loaded from cache instantly');
       }
@@ -251,6 +349,14 @@ class LikedMoviesProvider extends ChangeNotifier {
         'top_genres': _topGenres,
       });
       await prefs.setString('${_cacheKeyStats}_$userId', statsJson);
+
+      // Save mood
+      final moodJson = jsonEncode({
+        'mood_history': _moodHistory,
+        'current_mood': _currentMood,
+        'current_emoji': _currentEmoji,
+      });
+      await prefs.setString('${_cacheKeyMood}_$userId', moodJson);
     } catch (e) {
       print('⚠️ Cache save failed: $e');
     }
@@ -381,6 +487,9 @@ class LikedMoviesProvider extends ChangeNotifier {
     _totalLikes = 0;
     _totalPasses = 0;
     _topGenres = [];
+    _moodHistory = [];
+    _currentMood = null;
+    _currentEmoji = null;
     _isLoaded = false;
     notifyListeners();
   }

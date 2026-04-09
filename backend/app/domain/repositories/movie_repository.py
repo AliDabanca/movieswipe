@@ -9,21 +9,21 @@ class MovieRepository(ABC):
     """Abstract repository for Movie entity."""
 
     @abstractmethod
-    async def get_all(self) -> List[Movie]:
+    def get_all(self) -> List[Movie]:
         """Get all movies."""
         pass
 
     @abstractmethod
-    async def get_by_id(self, movie_id: int) -> Movie | None:
+    def get_by_id(self, movie_id: int) -> Movie | None:
         """Get movie by ID."""
         pass
 
     @abstractmethod
-    async def create(self, movie: Movie) -> Movie:
+    def create(self, movie: Movie) -> Movie:
         """Create a new movie."""
         pass
 
     @abstractmethod
-    async def swipe(self, movie_id: int, is_like: bool, user_id: str, rating: int | None = None) -> None:
+    def swipe(self, movie_id: int, is_like: bool, user_id: str, rating: int | None = None) -> None:
         """Record a swipe action."""
         pass

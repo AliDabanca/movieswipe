@@ -9,8 +9,8 @@ Architecture:
 import random
 import logging
 from typing import List, Dict, Tuple, Any
-from datetime import datetime
-from collections import Counter
+from datetime import datetime, timedelta
+from collections import Counter, defaultdict
 
 from app.data.datasources.supabase_datasource import SupabaseDataSource
 from app.domain.entities.movie import Movie
@@ -673,3 +673,150 @@ class RecommendationService:
             "recently_added": recently_added,
             "by_genre": sorted_genres
         }
+
+    # ── Mood History ──────────────────────────────────────────
+
+    # Genre → Mood mapping
+    GENRE_MOOD_MAP = {
+        "Comedy":            {"mood": "Neşeli",      "emoji": "😄", "color": "#FFD93D"},
+        "Romance":           {"mood": "Romantik",    "emoji": "💕", "color": "#FF6B8A"},
+        "Action":            {"mood": "Heyecanlı",   "emoji": "🔥", "color": "#FF6B35"},
+        "Adventure":         {"mood": "Heyecanlı",   "emoji": "🔥", "color": "#FF6B35"},
+        "Horror":            {"mood": "Gerilimci",   "emoji": "😈", "color": "#8B5CF6"},
+        "Thriller":          {"mood": "Gerilimci",   "emoji": "😈", "color": "#8B5CF6"},
+        "Drama":             {"mood": "Düşünceli",   "emoji": "🤔", "color": "#4361EE"},
+        "Science Fiction":   {"mood": "Hayalperest", "emoji": "🚀", "color": "#06D6A0"},
+        "Sci-Fi":            {"mood": "Hayalperest", "emoji": "🚀", "color": "#06D6A0"},
+        "Fantasy":           {"mood": "Hayalperest", "emoji": "🚀", "color": "#06D6A0"},
+        "Animation":         {"mood": "Eğlenceli",  "emoji": "🎉", "color": "#FF9F1C"},
+        "Family":            {"mood": "Eğlenceli",  "emoji": "🎉", "color": "#FF9F1C"},
+        "Documentary":       {"mood": "Meraklı",    "emoji": "📚", "color": "#2EC4B6"},
+        "History":           {"mood": "Meraklı",    "emoji": "📚", "color": "#2EC4B6"},
+        "Crime":             {"mood": "Karanlık",   "emoji": "🌑", "color": "#6C757D"},
+        "Mystery":           {"mood": "Karanlık",   "emoji": "🌑", "color": "#6C757D"},
+        "War":               {"mood": "Karanlık",   "emoji": "🌑", "color": "#6C757D"},
+        "Music":             {"mood": "Keşifçi",    "emoji": "🎭", "color": "#E8A87C"},
+        "Western":           {"mood": "Keşifçi",    "emoji": "🎭", "color": "#E8A87C"},
+    }
+
+    DEFAULT_MOOD = {"mood": "Keşifçi", "emoji": "🎭", "color": "#E8A87C"}
+
+    # Turkish month abbreviations
+    _TR_MONTHS = {
+        1: "Oca", 2: "Şub", 3: "Mar", 4: "Nis", 5: "May", 6: "Haz",
+        7: "Tem", 8: "Ağu", 9: "Eyl", 10: "Eki", 11: "Kas", 12: "Ara",
+    }
+
+    def get_mood_history(self, user_id: str, weeks: int = 12) -> Dict[str, Any]:
+        """Analyze the user's swipe history to produce weekly mood snapshots.
+
+        Algorithm:
+            1. Fetch all liked swipes with timestamps
+            2. Join with movie genres
+            3. Group by ISO week
+            4. For each week, find the dominant genre → map to mood
+            5. Return the last `weeks` entries
+
+        Returns:
+            {
+              "mood_history": [...],
+              "current_mood": str,
+              "current_emoji": str,
+            }
+        """
+        # 1. Fetch liked swipes with timestamps
+        liked_swipes = self.supabase_ds.client.table("user_swipes") \
+            .select("movie_id, swiped_at") \
+            .eq("user_id", user_id) \
+            .eq("is_like", True) \
+            .order("swiped_at", desc=False) \
+            .execute()
+
+        if not liked_swipes.data:
+            return {"mood_history": [], "current_mood": None, "current_emoji": None}
+
+        # 2. Collect movie IDs and fetch genre info
+        movie_ids = list({s["movie_id"] for s in liked_swipes.data})
+        try:
+            movies_data = self.supabase_ds.get_movies_by_ids(movie_ids)
+        except Exception as e:
+            logger.error(f"Mood history: failed to fetch movies: {e}")
+            return {"mood_history": [], "current_mood": None, "current_emoji": None}
+
+        movie_genre_map = {m["id"]: m.get("genre", "General") for m in movies_data}
+
+        # 3. Group swipes by ISO week
+        weekly_genres: Dict[str, Counter] = defaultdict(Counter)
+
+        for swipe in liked_swipes.data:
+            movie_id = swipe["movie_id"]
+            genre = movie_genre_map.get(movie_id, "General")
+            swiped_at_str = swipe.get("swiped_at")
+            if not swiped_at_str:
+                continue
+
+            try:
+                swiped_dt = datetime.fromisoformat(swiped_at_str.replace("Z", "+00:00"))
+                iso_year, iso_week, _ = swiped_dt.isocalendar()
+                week_key = f"{iso_year}-W{iso_week:02d}"
+                weekly_genres[week_key][genre] += 1
+            except (ValueError, AttributeError) as e:
+                logger.debug(f"Mood history: skipping bad date {swiped_at_str}: {e}")
+                continue
+
+        if not weekly_genres:
+            return {"mood_history": [], "current_mood": None, "current_emoji": None}
+
+        # 4. Build mood entries per week (sorted chronologically)
+        mood_history = []
+        for week_key in sorted(weekly_genres.keys()):
+            genre_counter = weekly_genres[week_key]
+            dominant_genre = genre_counter.most_common(1)[0][0]
+            total_likes = sum(genre_counter.values())
+
+            mood_info = self.GENRE_MOOD_MAP.get(dominant_genre, self.DEFAULT_MOOD)
+
+            # Build human-readable week label (e.g. "31 Mar - 6 Nis")
+            week_label = self._week_key_to_label(week_key)
+
+            mood_history.append({
+                "week": week_key,
+                "week_label": week_label,
+                "dominant_mood": mood_info["mood"],
+                "mood_emoji": mood_info["emoji"],
+                "mood_color": mood_info["color"],
+                "genre_breakdown": dict(genre_counter),
+                "total_likes": total_likes,
+            })
+
+        # Keep only the last N weeks
+        mood_history = mood_history[-weeks:]
+
+        # Current mood = most recent week's mood
+        current = mood_history[-1] if mood_history else None
+
+        return {
+            "mood_history": mood_history,
+            "current_mood": current["dominant_mood"] if current else None,
+            "current_emoji": current["mood_emoji"] if current else None,
+        }
+
+    def _week_key_to_label(self, week_key: str) -> str:
+        """Convert '2026-W14' to '31 Mar - 6 Nis' style label."""
+        try:
+            # Parse ISO week to get Monday of that week
+            year_str, week_str = week_key.split("-W")
+            year = int(year_str)
+            week_num = int(week_str)
+            monday = datetime.strptime(f"{year}-W{week_num:02d}-1", "%G-W%V-%u")
+            sunday = monday + timedelta(days=6)
+
+            m_month = self._TR_MONTHS.get(monday.month, str(monday.month))
+            s_month = self._TR_MONTHS.get(sunday.month, str(sunday.month))
+
+            if monday.month == sunday.month:
+                return f"{monday.day} - {sunday.day} {s_month}"
+            else:
+                return f"{monday.day} {m_month} - {sunday.day} {s_month}"
+        except Exception:
+            return week_key

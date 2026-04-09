@@ -4,6 +4,9 @@ import 'package:provider/provider.dart';
 import 'package:movieswipe/core/providers/auth_provider.dart';
 import 'package:movieswipe/core/providers/liked_movies_provider.dart';
 import 'package:movieswipe/features/users/presentation/widgets/avatar_selection_sheet.dart';
+import 'package:movieswipe/features/users/presentation/widgets/genre_dna_chart.dart';
+import 'package:movieswipe/features/users/presentation/widgets/current_mood_aura.dart';
+import 'package:movieswipe/features/users/presentation/widgets/cover_selection_sheet.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -26,21 +29,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: const Color(0xFF0F0F1E),
+      backgroundColor: Colors.transparent,
       endDrawer: _buildDrawer(context, auth, likedProvider),
       body: Stack(
         children: [
-          // Background Gradients
-          Positioned(
-            top: -100,
-            right: -50,
-            child: _buildBlurSphere(const Color(0xFFE94560), 300),
-          ),
-          Positioned(
-            bottom: 100,
-            left: -100,
-            child: _buildBlurSphere(const Color(0xFF4361EE), 400),
-          ),
 
           SafeArea(
             child: CustomScrollView(
@@ -57,37 +49,23 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
 
-                // Achievements Section
-                if (likedProvider.achievements.isNotEmpty) ...[
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(24, 32, 24, 16),
-                      child: Text(
-                        'Başarımların',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ),
+                // Mood Aura Section
+                if (likedProvider.currentMood != null)
                   SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: 100,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        scrollDirection: Axis.horizontal,
-                        itemCount: likedProvider.achievements.length,
-                        itemBuilder: (context, index) {
-                          final badge = likedProvider.achievements[index];
-                          return _buildAchievementBadge(badge);
-                        },
-                      ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      child: _buildMoodSection(likedProvider),
                     ),
                   ),
-                ],
+
+                // Movie DNA Section
+                if (likedProvider.moviesByGenre.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                      child: _buildDnaSection(likedProvider),
+                    ),
+                  ),
 
                 const SliverToBoxAdapter(child: SizedBox(height: 100)),
               ],
@@ -148,58 +126,128 @@ class _ProfilePageState extends State<ProfilePage> {
 
                 Divider(color: Colors.white.withValues(alpha: 0.06)),
 
-                const SizedBox(height: 8),
+                // Scrollable Content area
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 8),
 
-                // Stats - collapsible
-                Theme(
-                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                  child: ExpansionTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.bar_chart_rounded,
-                          color: Colors.white70, size: 20),
+                        // Stats - collapsible
+                        Theme(
+                          data: Theme.of(context)
+                              .copyWith(dividerColor: Colors.transparent),
+                          child: ExpansionTile(
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.bar_chart_rounded,
+                                  color: Colors.white70, size: 20),
+                            ),
+                            title: const Text(
+                              'İstatistikler',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            trailing: Icon(Icons.expand_more_rounded,
+                                color: Colors.white.withValues(alpha: 0.3),
+                                size: 20),
+                            tilePadding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 2),
+                            childrenPadding:
+                                const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                            children: [
+                              _buildDrawerStats(liked),
+                            ],
+                          ),
+                        ),
+
+                        Divider(color: Colors.white.withValues(alpha: 0.06)),
+
+                        // Achievements - collapsible
+                        Theme(
+                          data: Theme.of(context)
+                              .copyWith(dividerColor: Colors.transparent),
+                          child: ExpansionTile(
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.emoji_events_rounded,
+                                  color: Colors.white70, size: 20),
+                            ),
+                            title: Row(
+                              children: [
+                                const Expanded(
+                                  child: Text(
+                                    'Başarımlar',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE94560)
+                                        .withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    '${liked.achievements.where((a) => a['isUnlocked'] == true).length}/${liked.achievements.length}',
+                                    style: const TextStyle(
+                                      color: Color(0xFFE94560),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            trailing: Icon(Icons.expand_more_rounded,
+                                color: Colors.white.withValues(alpha: 0.3),
+                                size: 20),
+                            tilePadding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 2),
+                            childrenPadding:
+                                const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                            children: [
+                              _buildDrawerAchievementsGrid(liked),
+                            ],
+                          ),
+                        ),
+
+                        Divider(color: Colors.white.withValues(alpha: 0.06)),
+
+                        // Menu Items
+                        const SizedBox(height: 4),
+
+                        _buildDrawerItem(
+                          icon: Icons.settings_rounded,
+                          label: 'Ayarlar',
+                          onTap: () {
+                            Navigator.pop(context);
+                            // TODO: Navigate to settings page
+                          },
+                        ),
+                      ],
                     ),
-                    title: const Text(
-                      'İstatistikler',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    trailing: Icon(Icons.expand_more_rounded,
-                        color: Colors.white.withValues(alpha: 0.3), size: 20),
-                    tilePadding:
-                        const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
-                    childrenPadding:
-                        const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    children: [
-                      _buildDrawerStats(liked),
-                    ],
                   ),
                 ),
 
-                Divider(color: Colors.white.withValues(alpha: 0.06)),
-
-                // Menu Items
-                const SizedBox(height: 4),
-
-                _buildDrawerItem(
-                  icon: Icons.settings_rounded,
-                  label: 'Ayarlar',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: Navigate to settings page
-                  },
-                ),
-
-                const Spacer(),
-
-                // Logout
+                // Logout button stays at the bottom
                 Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -331,23 +379,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ─── Main Page Widgets ───────────────────────────────────────────────
-
-  Widget _buildBlurSphere(Color color, double size) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color.withValues(alpha: 0.15),
-      ),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 100, sigmaY: 100),
-        child: Container(color: Colors.transparent),
-      ),
-    );
-  }
-
   Widget _buildTopBar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -383,76 +414,110 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildGlassHeader(
       BuildContext context, AuthProvider auth, LikedMoviesProvider liked) {
     return _GlassCard(
+      padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          // Avatar + Edit Button
-          Stack(
+          Row(
             children: [
+              // Avatar
               GestureDetector(
-                onTap: () => _showAvatarSelection(context),
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [
-                        const Color(0xFFE94560).withValues(alpha: 0.5),
-                        const Color(0xFF4361EE).withValues(alpha: 0.5),
-                      ],
-                    ),
-                    border: Border.all(color: Colors.white24, width: 2),
-                  ),
-                  child: Center(
-                    child: Text(
-                      auth.avatarUrl ?? (auth.username?[0].toUpperCase() ?? 'U'),
-                      style: TextStyle(
-                        fontSize: auth.avatarUrl != null ? 50 : 40,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                onTap: () => _showAvatarSelection(context, auth),
+                child: Stack(
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFFE94560).withValues(alpha: 0.5),
+                          width: 2,
+                        ),
+                        color: Colors.white.withValues(alpha: 0.05),
+                        image: (auth.avatarUrl != null && auth.avatarUrl!.startsWith('http'))
+                            ? DecorationImage(
+                                image: NetworkImage(auth.avatarUrl!),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                      ),
+                      child: Center(
+                        child: auth.avatarUrl == null
+                            ? const Icon(Icons.person, size: 40, color: Colors.white54)
+                            : (!auth.avatarUrl!.startsWith('http')
+                                ? Text(auth.avatarUrl!, style: const TextStyle(fontSize: 40))
+                                : null),
                       ),
                     ),
-                  ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFE94560),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.edit,
+                            size: 14, color: Colors.white),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: GestureDetector(
-                  onTap: () => _showAvatarSelection(context),
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFE94560),
-                      shape: BoxShape.circle,
+              const SizedBox(width: 20),
+              // User Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      onTap: () => _showNameEditDialog(context, auth),
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              auth.displayName ?? auth.username ?? 'Film Sever',
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: -0.5,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(Icons.edit,
+                              size: 16,
+                              color: Colors.white.withValues(alpha: 0.3)),
+                        ],
+                      ),
                     ),
-                    child:
-                        const Icon(Icons.edit, size: 14, color: Colors.white),
+                    Text(
+                      '@${auth.username ?? 'yeni_uye'}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Cover Edit Button
+              IconButton(
+                onPressed: () => _showCoverSelection(context, auth),
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    shape: BoxShape.circle,
                   ),
+                  child: const Icon(Icons.brush_rounded,
+                      color: Colors.white70, size: 20),
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 20),
-          // Name + Username
-          GestureDetector(
-            onTap: () => _showNameEditDialog(context, auth),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  auth.displayName ?? auth.username ?? 'Film Sever',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(Icons.edit,
-                    size: 16, color: Colors.white.withValues(alpha: 0.3)),
-              ],
-            ),
           ),
           const SizedBox(height: 16),
           // DNA Title Badge
@@ -486,34 +551,252 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildAchievementBadge(Map<String, dynamic> badge) {
-    return Container(
-      width: 80,
-      margin: const EdgeInsets.only(right: 12),
+  void _showCoverSelection(BuildContext context, AuthProvider auth) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => CoverSelectionSheet(
+        currentPresetId: auth.coverPhotoUrl,
+        onSelected: (presetId) {
+          auth.updateProfile(coverPhotoUrl: presetId);
+        },
+      ),
+    );
+  }
+
+  Widget _buildMoodSection(LikedMoviesProvider liked) {
+    return _GlassCard(
+      padding: EdgeInsets.zero, // The aura widget handles its own spacing
+      child: CurrentMoodAura(
+        currentMood: liked.currentMood,
+        currentEmoji: liked.currentEmoji,
+      ),
+    );
+  }
+
+  Widget _buildDnaSection(LikedMoviesProvider liked) {
+    // Build genre count data from moviesByGenre
+    final genreData = <String, int>{};
+    for (final entry in liked.moviesByGenre.entries) {
+      genreData[entry.key] = entry.value.length;
+    }
+
+    return _GlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white12),
-            ),
-            child: Center(
-              child: Text(
-                badge['icon'],
-                style: const TextStyle(fontSize: 28),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4361EE).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.fingerprint_rounded,
+                    color: Color(0xFF4361EE), size: 18),
               ),
-            ),
+              const SizedBox(width: 10),
+              const Text(
+                'Film DNA\'n',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
+          GenreDnaChart(genreData: genreData),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerAchievementsGrid(LikedMoviesProvider liked) {
+    final allAchievements = liked.achievements;
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 10,
+        childAspectRatio: 0.75,
+      ),
+      itemCount: allAchievements.length,
+      itemBuilder: (context, index) {
+        final badge = allAchievements[index];
+        final isUnlocked = badge['isUnlocked'] as bool;
+        return GestureDetector(
+          onTap: () => _showAchievementDetail(context, badge),
+          child: _buildAchievementTile(badge, isUnlocked),
+        );
+      },
+    );
+  }
+
+  Widget _buildAchievementTile(Map<String, dynamic> badge, bool isUnlocked) {
+    return Opacity(
+      opacity: isUnlocked ? 1.0 : 0.35,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isUnlocked
+                  ? const Color(0xFFE94560).withValues(alpha: 0.12)
+                  : Colors.white.withValues(alpha: 0.04),
+              border: Border.all(
+                color: isUnlocked
+                    ? const Color(0xFFE94560).withValues(alpha: 0.4)
+                    : Colors.white.withValues(alpha: 0.08),
+                width: 1.5,
+              ),
+              boxShadow: isUnlocked
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFE94560).withValues(alpha: 0.2),
+                        blurRadius: 12,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Center(
+              child: isUnlocked
+                  ? Text(
+                      badge['icon'],
+                      style: const TextStyle(fontSize: 26),
+                    )
+                  : ColorFiltered(
+                      colorFilter: const ColorFilter.matrix(<double>[
+                        0.2126, 0.7152, 0.0722, 0, 0,
+                        0.2126, 0.7152, 0.0722, 0, 0,
+                        0.2126, 0.7152, 0.0722, 0, 0,
+                        0,      0,      0,      1, 0,
+                      ]),
+                      child: Text(
+                        badge['icon'],
+                        style: const TextStyle(fontSize: 26),
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 6),
           Text(
             badge['title'],
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11, color: Colors.white70),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: isUnlocked ? FontWeight.w600 : FontWeight.w400,
+              color: isUnlocked
+                  ? Colors.white.withValues(alpha: 0.9)
+                  : Colors.white.withValues(alpha: 0.4),
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showAchievementDetail(
+      BuildContext context, Map<String, dynamic> badge) {
+    final isUnlocked = badge['isUnlocked'] as bool;
+    showDialog(
+      context: context,
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: AlertDialog(
+          backgroundColor: const Color(0xFF1a1a2e).withValues(alpha: 0.9),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Badge icon large
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isUnlocked
+                      ? const Color(0xFFE94560).withValues(alpha: 0.15)
+                      : Colors.white.withValues(alpha: 0.05),
+                  border: Border.all(
+                    color: isUnlocked
+                        ? const Color(0xFFE94560).withValues(alpha: 0.5)
+                        : Colors.white12,
+                    width: 2,
+                  ),
+                ),
+                child: Center(
+                  child: isUnlocked
+                      ? Text(badge['icon'],
+                          style: const TextStyle(fontSize: 40))
+                      : ColorFiltered(
+                          colorFilter: const ColorFilter.matrix(<double>[
+                            0.2126, 0.7152, 0.0722, 0, 0,
+                            0.2126, 0.7152, 0.0722, 0, 0,
+                            0.2126, 0.7152, 0.0722, 0, 0,
+                            0,      0,      0,      1, 0,
+                          ]),
+                          child: Text(badge['icon'],
+                              style: const TextStyle(fontSize: 40)),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                badge['title'],
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                badge['description'] ?? '',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isUnlocked
+                      ? const Color(0xFF27AE60).withValues(alpha: 0.15)
+                      : Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  isUnlocked ? '✅ Kazanıldı' : '🔒 Kilitli',
+                  style: TextStyle(
+                    color: isUnlocked
+                        ? const Color(0xFF27AE60)
+                        : Colors.white.withValues(alpha: 0.5),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -571,7 +854,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  void _showAvatarSelection(BuildContext context) {
+  void _showAvatarSelection(BuildContext context, AuthProvider auth) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,

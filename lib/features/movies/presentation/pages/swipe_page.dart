@@ -19,7 +19,9 @@ class SwipePage extends StatefulWidget {
 }
 
 class _SwipePageState extends State<SwipePage> {
-  final CardSwiperController controller = CardSwiperController();
+  CardSwiperController controller = CardSwiperController();
+  // Key to force-rebuild CardSwiper when new batch arrives
+  int _swiperGeneration = 0;
 
   @override
   void dispose() {
@@ -29,22 +31,34 @@ class _SwipePageState extends State<SwipePage> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<MoviesBloc, MoviesState>(
-      builder: (context, state) {
-        if (state is MoviesLoading || state is MoviesInitial) {
-          return _buildLoadingSkeleton(context);
-        } else if (state is MoviesRefreshing) {
-          // Show existing cards while refreshing — no jarring loading screen
-          return _buildSwipeCards(context, state.movies);
-        } else if (state is MoviesEndOfContent) {
-          return _buildEndOfContent(context, state.message);
-        } else if (state is MoviesLoaded) {
-          return _buildSwipeCards(context, state.movies);
-        } else if (state is MoviesError) {
-          return _buildError(context, state.message);
+    return BlocListener<MoviesBloc, MoviesState>(
+      listener: (context, state) {
+        if (state is MoviesLoaded) {
+          // New batch arrived — rebuild the swiper with a fresh controller
+          setState(() {
+            controller.dispose();
+            controller = CardSwiperController();
+            _swiperGeneration++;
+          });
         }
-        return _buildLoadingSkeleton(context);
       },
+      child: BlocBuilder<MoviesBloc, MoviesState>(
+        builder: (context, state) {
+          if (state is MoviesLoading || state is MoviesInitial) {
+            return _buildLoadingSkeleton(context);
+          } else if (state is MoviesRefreshing) {
+            // Show existing cards while refreshing — no jarring loading screen
+            return _buildSwipeCards(context, state.movies);
+          } else if (state is MoviesEndOfContent) {
+            return _buildEndOfContent(context, state.message);
+          } else if (state is MoviesLoaded) {
+            return _buildSwipeCards(context, state.movies);
+          } else if (state is MoviesError) {
+            return _buildError(context, state.message);
+          }
+          return _buildLoadingSkeleton(context);
+        },
+      ),
     );
   }
 
@@ -114,6 +128,7 @@ class _SwipePageState extends State<SwipePage> {
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: CardSwiper(
+                key: ValueKey(_swiperGeneration),
                 controller: controller,
                 cardsCount: movies.length,
                 cardBuilder: (context, index, percentThresholdX, percentThresholdY) {

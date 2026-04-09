@@ -18,7 +18,7 @@ class MovieRepositoryImpl(MovieRepository):
         # Only initialize TMDB if API key is provided
         self.tmdb_service = TMDBService() if settings.tmdb_api_key else None
 
-    async def get_all(self) -> List[Movie]:
+    def get_all(self) -> List[Movie]:
         """
         Get all movies from Supabase. If empty and TMDB available, fetch from TMDB and cache.
         
@@ -30,12 +30,20 @@ class MovieRepositoryImpl(MovieRepository):
             
             # If Supabase is empty and TMDB is available, fetch from TMDB and save
             if not movies_data and self.tmdb_service:
+                import asyncio
                 print("📡 Fetching movies from TMDB (5 pages = ~100 movies)...")
                 
+                # Using asyncio.run here is safe because this runs in FastAPI's threadpool thread
+                # which doesn't have a running asyncio loop
                 all_tmdb_movies = []
-                # Fetch 5 pages to get ~100 movies
                 for page in range(1, 6):
-                    page_movies = await self.tmdb_service.get_popular_movies(page=page)
+                    try:
+                        loop = asyncio.get_event_loop()
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        
+                    page_movies = loop.run_until_complete(self.tmdb_service.get_popular_movies(page=page))
                     all_tmdb_movies.extend(page_movies)
                     print(f"  📄 Page {page}/5: {len(page_movies)} movies")
                 
@@ -66,9 +74,16 @@ class MovieRepositoryImpl(MovieRepository):
             
             # If Supabase fails and TMDB is available, fallback to TMDB directly
             if self.tmdb_service:
+                import asyncio
                 try:
                     print("🔄 Falling back to TMDB (1 page)...")
-                    tmdb_movies = await self.tmdb_service.get_popular_movies(page=1)
+                    try:
+                        loop = asyncio.get_event_loop()
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        
+                    tmdb_movies = loop.run_until_complete(self.tmdb_service.get_popular_movies(page=1))
                     
                     movies = []
                     for tmdb_movie in tmdb_movies[:20]:
@@ -86,7 +101,7 @@ class MovieRepositoryImpl(MovieRepository):
             
             return []
 
-    async def get_by_id(self, movie_id: int) -> Movie | None:
+    def get_by_id(self, movie_id: int) -> Movie | None:
         """Get movie by ID from Supabase."""
         try:
             movie_data = self.supabase_ds.get_movie_by_id(movie_id)
@@ -97,13 +112,13 @@ class MovieRepositoryImpl(MovieRepository):
             print(f"⚠️  Error fetching movie {movie_id}: {e}")
             return None
 
-    async def create(self, movie: Movie) -> Movie:
+    def create(self, movie: Movie) -> Movie:
         """Create a new movie in Supabase."""
         movie_model = MovieModel.from_entity(movie)
         saved_data = self.supabase_ds.save_movie(movie_model.model_dump())
         return MovieModel(**saved_data).to_entity()
 
-    async def swipe(self, movie_id: int, is_like: bool, user_id: str, rating: int | None = None) -> None:
+    def swipe(self, movie_id: int, is_like: bool, user_id: str, rating: int | None = None) -> None:
         """Record a swipe action. Auto-imports movie if missing."""
         try:
             self.supabase_ds.save_swipe(user_id, movie_id, is_like, rating)
@@ -117,8 +132,15 @@ class MovieRepositoryImpl(MovieRepository):
                     raise ServerError("TMDB service not available for auto-import")
                 
                 # Fetch details from TMDB
+                import asyncio
                 try:
-                    tmdb_movie = await self.tmdb_service.get_movie_details(movie_id)
+                    try:
+                        loop = asyncio.get_event_loop()
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        
+                    tmdb_movie = loop.run_until_complete(self.tmdb_service.get_movie_details(movie_id))
                     
                     # Convert to our format and save
                     movie_dict = {

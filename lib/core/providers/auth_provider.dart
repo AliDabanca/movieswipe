@@ -9,6 +9,7 @@ class AuthProvider extends ChangeNotifier {
   String? _username;
   String? _displayName;
   String? _avatarUrl;
+  String? _coverPhotoUrl;
   List<int> _pinnedMovieIds = [];
   bool _hasProfile = false;
   bool _profileChecked = false;
@@ -27,6 +28,7 @@ class AuthProvider extends ChangeNotifier {
   String? get username => _username;
   String? get displayName => _displayName;
   String? get avatarUrl => _avatarUrl;
+  String? get coverPhotoUrl => _coverPhotoUrl;
   List<int> get pinnedMovieIds => _pinnedMovieIds;
   bool get hasProfile => _hasProfile;
   bool get profileChecked => _profileChecked;
@@ -71,7 +73,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       final response = await _client
           .from('profiles')
-          .select('username, display_name, avatar_url, pinned_movie_ids')
+          .select('username, display_name, avatar_url, cover_photo_url, pinned_movie_ids')
           .eq('id', _user!.id)
           .maybeSingle();
 
@@ -79,6 +81,7 @@ class AuthProvider extends ChangeNotifier {
         _username = response['username'] as String?;
         _displayName = response['display_name'] as String?;
         _avatarUrl = response['avatar_url'] as String?;
+        _coverPhotoUrl = response['cover_photo_url'] as String?;
         _pinnedMovieIds = List<int>.from(response['pinned_movie_ids'] ?? []);
         _hasProfile = _username != null;
       } else {
@@ -86,6 +89,7 @@ class AuthProvider extends ChangeNotifier {
         _username = null;
         _displayName = null;
         _avatarUrl = null;
+        _coverPhotoUrl = null;
         _pinnedMovieIds = [];
       }
     } catch (e) {
@@ -254,6 +258,7 @@ class AuthProvider extends ChangeNotifier {
     String? username,
     String? displayName,
     String? avatarUrl,
+    String? coverPhotoUrl,
     List<int>? pinnedMovieIds,
   }) async {
     if (_user == null) return false;
@@ -266,6 +271,7 @@ class AuthProvider extends ChangeNotifier {
       if (username != null) updateData['username'] = username;
       if (displayName != null) updateData['display_name'] = displayName;
       if (avatarUrl != null) updateData['avatar_url'] = avatarUrl;
+      if (coverPhotoUrl != null) updateData['cover_photo_url'] = coverPhotoUrl;
       if (pinnedMovieIds != null) updateData['pinned_movie_ids'] = pinnedMovieIds;
 
       if (updateData.isEmpty) return true;
@@ -276,6 +282,7 @@ class AuthProvider extends ChangeNotifier {
       if (username != null) _username = username;
       if (displayName != null) _displayName = displayName;
       if (avatarUrl != null) _avatarUrl = avatarUrl;
+      if (coverPhotoUrl != null) _coverPhotoUrl = coverPhotoUrl;
       if (pinnedMovieIds != null) _pinnedMovieIds = pinnedMovieIds;
 
       notifyListeners();

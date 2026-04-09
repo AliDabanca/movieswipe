@@ -18,20 +18,7 @@ class MyListPage extends StatelessWidget {
     return Consumer<LikedMoviesProvider>(
       builder: (context, provider, _) {
         if (provider.isLoading && !provider.isLoaded) {
-          return Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF6366F1),
-                  Color(0xFF8B5CF6),
-                  Color(0xFFEC4899),
-                ],
-              ),
-            ),
-            child: const Center(child: CircularProgressIndicator(color: Colors.white)),
-          );
+          return const Center(child: CircularProgressIndicator(color: Colors.white));
         }
 
         if (provider.moviesByGenre.isEmpty) {
@@ -127,19 +114,8 @@ class _MyListContentState extends State<_MyListContent> {
     final filteredMoviesMap = _getFilteredMovies(provider);
 
     final scaffold = Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF6366F1),
-              Color(0xFF8B5CF6),
-              Color(0xFFEC4899),
-            ],
-          ),
-        ),
-        child: CustomScrollView(
+      backgroundColor: Colors.transparent,
+      body: CustomScrollView(
           slivers: [
             SliverAppBar(
               floating: true,
@@ -376,7 +352,6 @@ class _MyListContentState extends State<_MyListContent> {
             ),
           ],
         ),
-      ),
     );
 
     return Stack(

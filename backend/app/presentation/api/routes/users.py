@@ -15,7 +15,7 @@ supabase_ds = SupabaseDataSource()
 
 
 @router.get("/me/profile")
-async def get_my_profile(user_id: str = Depends(get_current_user_id)):
+def get_my_profile(user_id: str = Depends(get_current_user_id)):
     """
     Get the current user's profile with stats and preferences.
     """
@@ -32,6 +32,7 @@ async def get_my_profile(user_id: str = Depends(get_current_user_id)):
             result.update({
                 "display_name": profile_data.data.get("display_name"),
                 "avatar_url": profile_data.data.get("avatar_url"),
+                "cover_photo_url": profile_data.data.get("cover_photo_url"),
                 "username": profile_data.data.get("username"),
                 "pinned_movie_ids": profile_data.data.get("pinned_movie_ids", [])
             })
@@ -45,7 +46,7 @@ async def get_my_profile(user_id: str = Depends(get_current_user_id)):
 
 
 @router.patch("/me")
-async def update_my_profile(
+def update_my_profile(
     profile_update: UserProfileUpdate,
     user_id: str = Depends(get_current_user_id)
 ):
@@ -72,7 +73,7 @@ async def update_my_profile(
 
 
 @router.get("/me/liked-movies")
-async def get_my_liked_movies(user_id: str = Depends(get_current_user_id)):
+def get_my_liked_movies(user_id: str = Depends(get_current_user_id)):
     """
     Get the current user's liked movies grouped by genre.
     User ID comes from JWT token.
@@ -89,7 +90,7 @@ async def get_my_liked_movies(user_id: str = Depends(get_current_user_id)):
 
 
 @router.get("/me/stats")
-async def get_my_stats(user_id: str = Depends(get_current_user_id)):
+def get_my_stats(user_id: str = Depends(get_current_user_id)):
     """
     Get detailed user statistics.
     User ID comes from JWT token.
@@ -105,8 +106,24 @@ async def get_my_stats(user_id: str = Depends(get_current_user_id)):
         )
 
 
+@router.get("/me/mood-history")
+def get_my_mood_history(user_id: str = Depends(get_current_user_id)):
+    """
+    Get the user's weekly mood history derived from liked movie genres.
+    Returns up to 12 weeks of mood snapshots.
+    """
+    try:
+        mood_data = recommendation_service.get_mood_history(user_id)
+        return mood_data
+    except Exception as e:
+        logger.error(f"Failed to fetch mood history for user {user_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch mood history",
+        )
+
 @router.post("/me/update-taste-vector")
-async def update_taste_vector(user_id: str = Depends(get_current_user_id)):
+def update_taste_vector(user_id: str = Depends(get_current_user_id)):
     """
     Manually trigger a recalculation of the user's semantic taste vector.
     

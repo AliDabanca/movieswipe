@@ -7,6 +7,7 @@ import 'package:movieswipe/features/movies/presentation/pages/swipe_page.dart';
 import 'package:movieswipe/features/movies/presentation/pages/my_list_page.dart';
 import 'package:movieswipe/features/users/presentation/pages/profile_page.dart';
 import 'package:movieswipe/core/di/injection_container.dart';
+import 'package:movieswipe/core/presentation/widgets/global_app_background.dart';
 
 import 'package:movieswipe/features/movies/presentation/bloc/movies_bloc.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_event.dart';
@@ -47,35 +48,40 @@ class _MainNavigationState extends State<MainNavigation> {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => sl<MoviesBloc>()..add(LoadMoviesEvent()),
-      child: Scaffold(
-        body: IndexedStack(
-          index: _currentIndex,
-          children: _pages,
-        ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _currentIndex,
-          onDestinationSelected: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.swipe),
-              selectedIcon: Icon(Icons.swipe),
-              label: 'Swipe',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.favorite_outline),
-              selectedIcon: Icon(Icons.favorite),
-              label: 'My List',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
-              label: 'Profile',
-            ),
-          ],
+      child: GlobalAppBackground(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: IndexedStack(
+            index: _currentIndex,
+            children: _pages,
+          ),
+          bottomNavigationBar: NavigationBar(
+            backgroundColor: Colors.transparent,
+            indicatorColor: Colors.white.withValues(alpha: 0.1),
+            selectedIndex: _currentIndex,
+            onDestinationSelected: (index) {
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.swipe),
+                selectedIcon: Icon(Icons.swipe),
+                label: 'Swipe',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.favorite_outline),
+                selectedIcon: Icon(Icons.favorite),
+                label: 'My List',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline),
+                selectedIcon: Icon(Icons.person),
+                label: 'Profile',
+              ),
+            ],
+          ),
         ),
       ),
     );

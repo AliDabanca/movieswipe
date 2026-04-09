@@ -19,7 +19,7 @@ router = APIRouter(prefix="/movies", tags=["movies"])
 
 
 @router.get("/", response_model=List[MovieModel])
-async def get_movies(
+def get_movies(
     repository: MovieRepository = Depends(get_movie_repository),
 ):
     """
@@ -29,7 +29,7 @@ async def get_movies(
         List[MovieModel]: List of all movies
     """
     try:
-        entities = await repository.get_all()
+        entities = repository.get_all()
         return [MovieModel.from_entity(entity) for entity in entities]
     except Exception as e:
         logger.error(f"Failed to fetch all movies: {str(e)}", exc_info=True)
@@ -40,7 +40,7 @@ async def get_movies(
 
 
 @router.get("/{movie_id}", response_model=MovieModel)
-async def get_movie(
+def get_movie(
     movie_id: int,
     repository: MovieRepository = Depends(get_movie_repository),
 ):
@@ -54,7 +54,7 @@ async def get_movie(
         MovieModel: The requested movie
     """
     try:
-        entity = await repository.get_by_id(movie_id)
+        entity = repository.get_by_id(movie_id)
         if not entity:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -86,12 +86,18 @@ async def get_movie_details(
     # ── Helper coroutines for concurrent execution ────────────────
     async def _fetch_user_rating() -> int | None:
         try:
-            swipe = ds.client.table("user_swipes") \
-                .select("rating") \
-                .eq("user_id", user_id) \
-                .eq("movie_id", movie_id) \
-                .maybe_single() \
-                .execute()
+            # Re-wrap the sync call in a separate thread so it doesn't block the gather
+            from fastapi.concurrency import run_in_threadpool
+            
+            def db_call():
+                return ds.client.table("user_swipes") \
+                    .select("rating") \
+                    .eq("user_id", user_id) \
+                    .eq("movie_id", movie_id) \
+                    .maybe_single() \
+                    .execute()
+            
+            swipe = await run_in_threadpool(db_call)
             if swipe and swipe.data:
                 return swipe.data.get("rating")
         except Exception as e:
@@ -105,8 +111,9 @@ async def get_movie_details(
             logger.warning(f"TMDB details unavailable for {movie_id}: {tmdb_error}")
             # Fallback: basic info from our DB
             try:
+                from fastapi.concurrency import run_in_threadpool
                 local_ds = SupabaseDataSource()
-                local_movie = local_ds.get_movie_by_id(movie_id)
+                local_movie = await run_in_threadpool(local_ds.get_movie_by_id, movie_id)
                 return {
                     "id": local_movie["id"],
                     "name": local_movie.get("name", "Unknown"),
@@ -131,8 +138,9 @@ async def get_movie_details(
 
     async def _fetch_similar() -> list:
         try:
+            from fastapi.concurrency import run_in_threadpool
             similar_ds = SupabaseDataSource()
-            similar_raw = similar_ds.get_similar_movies(movie_id, limit=3)
+            similar_raw = await run_in_threadpool(similar_ds.get_similar_movies, movie_id, 3)
             return [
                 MovieModel(
                     id=m["id"],
@@ -226,7 +234,7 @@ async def get_watch_providers(movie_id: int, country: str = "TR"):
         await tmdb.close()
 
 @router.post("/{movie_id}/swipe", response_model=MessageResponse)
-async def swipe_movie(
+def swipe_movie(
     movie_id: int,
     request: SwipeRequest,
     background_tasks: BackgroundTasks,
@@ -245,7 +253,7 @@ async def swipe_movie(
     """
     try:
         # Save swipe via repository
-        await repository.swipe(movie_id, request.isLike, user_id, request.rating)
+        repository.swipe(movie_id, request.isLike, user_id, request.rating)
         
         action = "LIKE" if request.isLike else "PASS"
         logger.info(f"Swipe saved: User {user_id} - Movie {movie_id} - {action}")

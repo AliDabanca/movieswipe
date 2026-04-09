@@ -5,7 +5,7 @@ from app.core.supabase import supabase
 from app.core.logger import logger
 
 
-async def get_current_user_id(request: Request) -> str:
+def get_current_user_id(request: Request) -> str:
     """
     Extract and validate user ID from Supabase JWT token.
     

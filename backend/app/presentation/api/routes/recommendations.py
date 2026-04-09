@@ -21,7 +21,7 @@ class RecommendationResponse(BaseModel):
 
 
 @router.get("/", response_model=RecommendationResponse)
-async def get_recommendations(
+def get_recommendations(
     user_id: str = Depends(get_current_user_id),
     limit: int = Query(50, ge=1, le=100, description="Number of recommendations")
 ):
@@ -60,7 +60,7 @@ async def get_recommendations(
 
 
 @router.get("/debug/stats")
-async def get_user_stats(
+def get_user_stats(
     user_id: str = Depends(get_current_user_id),
 ):
     """
