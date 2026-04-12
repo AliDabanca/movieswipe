@@ -54,6 +54,20 @@ class ApiClient {
     }
   }
 
+  /// DELETE request
+  Future<dynamic> delete(String endpoint) async {
+    try {
+      final url = Uri.parse('${EnvConfig.baseUrl}$endpoint');
+      final response = await _client
+          .delete(url, headers: _headers)
+          .timeout(Duration(milliseconds: EnvConfig.apiTimeout));
+
+      return _handleResponse(response);
+    } catch (e) {
+      throw NetworkException(message: 'Failed to connect to server: $e');
+    }
+  }
+
   /// Handle HTTP response
   dynamic _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {

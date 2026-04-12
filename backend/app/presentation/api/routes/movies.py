@@ -157,12 +157,20 @@ async def get_movie_details(
             logger.warning(f"Similar movies unavailable for movie {movie_id}: {e}")
             return []
 
+    async def _fetch_watch_providers() -> dict:
+        try:
+            return await tmdb.get_watch_providers(movie_id)
+        except Exception as e:
+            logger.warning(f"Watch providers unavailable for movie {movie_id}: {e}")
+            return {"providers": [], "tmdb_link": ""}
+
     # ── Execute ALL tasks concurrently ────────────────────────────
     try:
-        user_rating, enriched, similar_movies = await asyncio.gather(
+        user_rating, enriched, similar_movies, watch_providers_raw = await asyncio.gather(
             _fetch_user_rating(),
             _fetch_enriched(),
             _fetch_similar(),
+            _fetch_watch_providers(),
         )
 
         if enriched is None:
@@ -191,6 +199,10 @@ async def get_movie_details(
             cast=enriched.get("cast", []),
             cast_details=enriched.get("cast_details", []),
             similar_movies=similar_movies,
+            watch_providers=WatchProvidersResponse(
+                providers=[WatchProviderModel(**p) for p in watch_providers_raw.get("providers", [])],
+                tmdb_link=watch_providers_raw.get("tmdb_link", "")
+            )
         )
     except HTTPException:
         raise
@@ -270,4 +282,31 @@ def swipe_movie(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save swipe",
+        )
+
+
+@router.delete("/{movie_id}/swipe", response_model=MessageResponse)
+def delete_swipe(
+    movie_id: int,
+    user_id: str = Depends(get_current_user_id),
+    repository: MovieRepository = Depends(get_movie_repository),
+):
+    """
+    Delete a swipe (undo like or pass).
+    
+    Args:
+        movie_id: The movie ID
+    
+    Returns:
+        Success message
+    """
+    try:
+        repository.delete_swipe(movie_id, user_id)
+        logger.info(f"Swipe deleted: User {user_id} - Movie {movie_id}")
+        return MessageResponse(message="Swipe deleted successfully")
+    except Exception as e:
+        logger.error(f"Failed to delete swipe for user {user_id}, movie {movie_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete swipe",
         )

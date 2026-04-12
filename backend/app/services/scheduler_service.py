@@ -52,10 +52,25 @@ class SchedulerService:
             logger.info("🛑 Scheduler stopped")
     
     async def run_startup_sync(self):
-        """Run an immediate sync on startup."""
-        logger.info("🔄 Running startup movie sync...")
-        await self._run_sync()
-        logger.info("✅ Startup sync complete!")
+        """Run an immediate sync on startup, but only if database is empty."""
+        try:
+            from app.data.datasources.supabase_datasource import SupabaseDataSource
+            ds = SupabaseDataSource()
+            count_resp = ds.client.table("movies").select("id", count="exact").limit(1).execute()
+            movie_count = count_resp.count or 0
+            
+            if movie_count > 0:
+                logger.info(
+                    f"Skipping startup sync (database already has {movie_count} movies). "
+                    f"Background updates will run every {self.SYNC_INTERVAL_HOURS} hours."
+                )
+                return
+            
+            logger.info("Database is empty - running initial movie sync...")
+            await self._run_sync()
+            logger.info("Initial sync complete!")
+        except Exception as e:
+            logger.error(f"Startup sync check failed: {e}")
     
     async def _run_sync(self):
         """Execute the actual sync job."""

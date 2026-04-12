@@ -25,19 +25,16 @@ class SwipeMovie {
       
       // If successful, return immediately
       if (result.isRight()) {
-        print('✅ Swipe saved successfully on attempt $attempts');
         return result;
       }
       
       // If this was the last attempt, return the error
       if (attempts >= maxAttempts) {
-        print('❌ Swipe failed after $maxAttempts attempts');
         return result;
       }
       
       // Wait before retrying (exponential backoff: 500ms, 1s, 2s)
       final delayMs = 500 * (1 << (attempts - 1));
-      print('⏳ Swipe attempt $attempts failed, retrying in ${delayMs}ms...');
       await Future.delayed(Duration(milliseconds: delayMs));
     }
     

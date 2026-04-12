@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Environment configuration manager
@@ -32,8 +33,8 @@ class EnvConfig {
     }
     
     await dotenv.load(fileName: fileName);
-    print('🌍 Environment loaded: $fileName');
-    print('📍 BASE_URL: $baseUrl');
-    print('⚙️  ENVIRONMENT: $environment');
+    debugPrint('🌍 Environment loaded: $fileName');
+    debugPrint('📍 BASE_URL: $baseUrl');
+    debugPrint('⚙️  ENVIRONMENT: $environment');
   }
 }

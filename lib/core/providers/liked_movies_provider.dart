@@ -44,8 +44,14 @@ class LikedMoviesProvider extends ChangeNotifier {
   bool _isLoaded = false;
   bool _isLoading = false;
 
+  // Counters (Persistent via SharedPreferences)
+  int _smartDiscoveryCount = 0;
+  int _moodDiscoveryCount = 0;
+
   LikedMoviesProvider({ApiClient? apiClient})
-      : _apiClient = apiClient ?? ApiClient(client: null);
+      : _apiClient = apiClient ?? ApiClient(client: null) {
+    _loadCounters();
+  }
 
   // Getters
   List<Map<String, dynamic>> get recentlyAddedAll => _recentlyAddedAll;
@@ -61,6 +67,10 @@ class LikedMoviesProvider extends ChangeNotifier {
   bool get isLoaded => _isLoaded;
   bool get isLoading => _isLoading;
   SortCriteria get currentSortCriteria => _currentSortCriteria;
+
+  // Counter Getters
+  int get smartDiscoveryCount => _smartDiscoveryCount;
+  int get moodDiscoveryCount => _moodDiscoveryCount;
 
   /// Dynamic title based on top genre
   String get movieDnaTitle {
@@ -107,7 +117,54 @@ class LikedMoviesProvider extends ChangeNotifier {
       if (hasGivenFiveStars) break;
     }
 
+    // NEW LOGIC HELPERS
+    final allMoviesList = _moviesByGenre.values.expand((list) => list).toList();
+    
+    // 1. Decade/Era Logic
+    final Set<int> decadesLikes = {};
+    int pre1990Count = 0;
+    int pre1970Count = 0;
+    int post2020Count = 0;
+    
+    // 2. Critical Logic
+    int fiveStarCount = 0;
+    int totalRatedCount = 0;
+    int highTmdbCount = 0; // 8.5+
+    
+    // 3. Genre Specific
+    int animationCount = _moviesByGenre['Animation']?.length ?? 0;
+    int docCount = _moviesByGenre['Documentary']?.length ?? 0;
+
+    for (final movie in allMoviesList) {
+      final releaseDate = movie['release_date'] as String? ?? '';
+      if (releaseDate.length >= 4) {
+        final year = int.tryParse(releaseDate.substring(0, 4)) ?? 0;
+        if (year > 0) {
+          decadesLikes.add((year / 10).floor() * 10);
+          if (year < 1990) pre1990Count++;
+          if (year < 1970) pre1970Count++;
+          if (year >= 2020) post2020Count++;
+        }
+      }
+
+      final userRating = movie['user_rating'] as int? ?? 0;
+      if (userRating > 0) totalRatedCount++;
+      if (userRating == 5) fiveStarCount++;
+      
+      final tmdbScore = (movie['vote_average'] as num? ?? 0.0);
+      if (tmdbScore >= 8.5) highTmdbCount++;
+    }
+
+    // 4. Balanced Taste Logic (Top 3 genres within 0.2)
+    bool isBalanced = false;
+    if (_topGenres.length >= 3) {
+      final score1 = _topGenres[0][1] as num;
+      final score3 = _topGenres[2][1] as num;
+      if ((score1 - score3).abs() <= 0.2) isBalanced = true;
+    }
+
     return [
+      // --- CORE (Existing 10) ---
       {
         'id': 'first_swipe',
         'title': 'İlk Adım',
@@ -177,6 +234,112 @@ class LikedMoviesProvider extends ChangeNotifier {
         'icon': '🏆',
         'description': 'Bir türde %40+ beğeni oranına ulaş',
         'isUnlocked': genreMasterName != null,
+      },
+
+      // --- NEW: AI & Discovery ---
+      {
+        'id': 'ai_explorer',
+        'title': 'AI Kaşifi',
+        'icon': '🧠',
+        'description': 'Smart AI Discovery\'i 5 kez kullan',
+        'isUnlocked': _smartDiscoveryCount >= 5,
+      },
+      {
+        'id': 'mood_voyager',
+        'title': 'Duygusal Yolculuk',
+        'icon': '🌈',
+        'description': 'Mod tabanlı keşfi 10 kez kullan',
+        'isUnlocked': _moodDiscoveryCount >= 10,
+      },
+      {
+        'id': 'indecisive',
+        'title': 'Kararsız',
+        'icon': '🌀',
+        'description': 'Toplam 200 film kaydır',
+        'isUnlocked': _totalSwipes >= 200,
+      },
+
+      // --- NEW: Time Travelers ---
+      {
+        'id': 'nostalgia_king',
+        'title': 'Nostalji Kralı',
+        'icon': '📽️',
+        'description': '1990 öncesi 10 film beğen',
+        'isUnlocked': pre1990Count >= 10,
+      },
+      {
+        'id': 'vintage_soul',
+        'title': 'Siyah Beyaz Ruhu',
+        'icon': '🎞️',
+        'description': '1970 öncesi 3 film beğen',
+        'isUnlocked': pre1970Count >= 3,
+      },
+      {
+        'id': 'modernist',
+        'title': 'Modernist',
+        'icon': '🚀',
+        'description': '2020 sonrası 15 film beğen',
+        'isUnlocked': post2020Count >= 15,
+      },
+      {
+        'id': 'century_fan',
+        'title': 'Yüzyılın İzleyicisi',
+        'icon': '📜',
+        'description': '5 farklı on yıla ait film beğen',
+        'isUnlocked': decadesLikes.length >= 5,
+      },
+
+      // --- NEW: Critical Thinking ---
+      {
+        'id': 'generous',
+        'title': 'Cömert',
+        'icon': '💎',
+        'description': '5 farklı filme 5 yıldız ver',
+        'isUnlocked': fiveStarCount >= 5,
+      },
+      {
+        'id': 'perfectionist',
+        'title': 'Mükemmeliyetçi',
+        'icon': '🌟',
+        'description': 'Puanı 8.5+ olan 10 film beğen',
+        'isUnlocked': highTmdbCount >= 10,
+      },
+      {
+        'id': 'master_critic',
+        'title': 'Usta Eleştirmen',
+        'icon': '🖋️',
+        'description': 'Toplam 20 filme puan ver',
+        'isUnlocked': totalRatedCount >= 20,
+      },
+
+      // --- NEW: Collector & Genre ---
+      {
+        'id': 'genre_collector',
+        'title': 'Tür Koleksiyoncusu',
+        'icon': '🏺',
+        'description': '10 farklı türden film beğen',
+        'isUnlocked': _moviesByGenre.keys.length >= 10,
+      },
+      {
+        'id': 'animation_fan',
+        'title': 'Animasyon Sever',
+        'icon': '🐬',
+        'description': '5 animasyon filmi beğen',
+        'isUnlocked': animationCount >= 5,
+      },
+      {
+        'id': 'doc_buff',
+        'title': 'Belgesel Meraklısı',
+        'icon': '📚',
+        'description': '3 belgesel beğen',
+        'isUnlocked': docCount >= 3,
+      },
+      {
+        'id': 'balanced_taste',
+        'title': 'Dengeli Zevk',
+        'icon': '⚖️',
+        'description': 'Tüm türlere karşı adilsin',
+        'isUnlocked': isBalanced,
       },
     ];
   }
@@ -266,8 +429,7 @@ class LikedMoviesProvider extends ChangeNotifier {
       // Save to cache for next startup
       await _saveToCache(userId);
     } catch (e) {
-      print('❌ Failed to load from API: $e');
-      // If cache was loaded, we still have data — that's fine
+      // logger.error('❌ Failed to load from API: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -322,10 +484,9 @@ class LikedMoviesProvider extends ChangeNotifier {
         }
 
         _isLoaded = true;
-        print('⚡ Loaded from cache instantly');
       }
     } catch (e) {
-      print('⚠️ Cache load failed: $e');
+      // logger.error('⚠️ Cache load failed: $e');
     }
   }
 
@@ -358,7 +519,7 @@ class LikedMoviesProvider extends ChangeNotifier {
       });
       await prefs.setString('${_cacheKeyMood}_$userId', moodJson);
     } catch (e) {
-      print('⚠️ Cache save failed: $e');
+      debugPrint('⚠️ Cache save failed: $e');
     }
   }
 
@@ -399,6 +560,38 @@ class LikedMoviesProvider extends ChangeNotifier {
     _totalSwipes++;
     _totalPasses++;
     notifyListeners();
+  }
+
+  /// Remove a movie from liked list (un-swipe/unlike)
+  void removeLikedMovie(int movieId) {
+    bool removed = false;
+
+    // 1. Remove from byGenre maps
+    _moviesByGenre.forEach((genre, list) {
+      final index = list.indexWhere((m) => m['id'] == movieId);
+      if (index != -1) {
+        list.removeAt(index);
+        removed = true;
+      }
+    });
+
+    // Clean up empty genre lists
+    _moviesByGenre.removeWhere((genre, list) => list.isEmpty);
+
+    // 2. Remove from recentlyAddedAll
+    final recentIndex = _recentlyAddedAll.indexWhere((m) => m['id'] == movieId);
+    if (recentIndex != -1) {
+      _recentlyAddedAll.removeAt(recentIndex);
+      removed = true;
+    }
+
+    if (removed) {
+      // 3. Update stats (Decrementing because we are undoing a like)
+      _totalSwipes--;
+      _totalLikes--;
+      _recalculateTopGenres();
+      notifyListeners();
+    }
   }
 
   /// Update the rating for a movie that is already in the liked list
@@ -491,6 +684,44 @@ class LikedMoviesProvider extends ChangeNotifier {
     _currentMood = null;
     _currentEmoji = null;
     _isLoaded = false;
+    notifyListeners();
+  }
+
+  // --- PERSISTENT COUNTERS ---
+
+  static const _keySmartCount = 'smart_discovery_count';
+  static const _keyMoodCount = 'mood_discovery_count';
+
+  Future<void> _loadCounters() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _smartDiscoveryCount = prefs.getInt(_keySmartCount) ?? 0;
+      _moodDiscoveryCount = prefs.getInt(_keyMoodCount) ?? 0;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('⚠️ Failed to load counters: $e');
+    }
+  }
+
+  Future<void> _saveCounters() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_keySmartCount, _smartDiscoveryCount);
+      await prefs.setInt(_keyMoodCount, _moodDiscoveryCount);
+    } catch (e) {
+      debugPrint('⚠️ Failed to save counters: $e');
+    }
+  }
+
+  void incrementSmartDiscovery() {
+    _smartDiscoveryCount++;
+    _saveCounters();
+    notifyListeners();
+  }
+
+  void incrementMoodDiscovery() {
+    _moodDiscoveryCount++;
+    _saveCounters();
     notifyListeners();
   }
 }

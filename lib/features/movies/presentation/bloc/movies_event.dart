@@ -1,5 +1,4 @@
 import 'package:equatable/equatable.dart';
-import 'package:movieswipe/features/movies/domain/entities/movie.dart';
 
 /// Movies events
 abstract class MoviesEvent extends Equatable {

@@ -820,3 +820,105 @@ class RecommendationService:
                 return f"{monday.day} {m_month} - {sunday.day} {s_month}"
         except Exception:
             return week_key
+
+    # ── Smart AI Discovery ────────────────────────────────────
+
+    # Each answer option maps to descriptive English keywords that the
+    # embedding model can understand semantically.
+    MOOD_TAGS = {
+        # Q1: Mood
+        "happy":      "cheerful upbeat lighthearted comedy funny feel-good",
+        "dark":       "dark tense suspenseful thriller horror creepy disturbing",
+        "emotional":  "emotional touching heartfelt romantic drama tearjerker love",
+        "adrenaline": "action explosive fast adventure battle superhero intense",
+        "thoughtful": "philosophical thought-provoking cerebral sci-fi existential mind-bending",
+        "chill":      "easy relaxing casual popcorn entertaining light fun",
+        # Q2: Pace
+        "fast":       "high-energy rapid action-packed exciting thrilling non-stop",
+        "calm":       "atmospheric slow-burn meditative contemplative serene quiet",
+        "twisty":     "plot-twist unpredictable mystery suspense puzzle mindbender",
+        "visual":     "visually stunning cinematic beautiful artistic breathtaking epic",
+        "grounded":   "realistic grounded true-to-life authentic gritty urban",
+        # Q3: World
+        "classic":    "classic timeless golden-age vintage old-school legendary masterpiece",
+        "modern":     "recent contemporary modern fresh new current",
+        "fantasy":    "fantasy sci-fi alien space otherworldly futuristic magical",
+        "true_story": "based-on-true-story biography real-events historical documentary inspired",
+        "cult":       "cult indie underground quirky unconventional experimental arthouse",
+    }
+
+    def get_mood_recommendations(
+        self, user_id: str, answers: list[str], limit: int = 5
+    ) -> list[Movie]:
+        """Generate movie recommendations from mood survey answers.
+
+        Algorithm:
+            1. Map each answer tag to its descriptive keywords
+            2. Concatenate into a single "mood sentence"
+            3. Generate an embedding vector from that sentence
+            4. Query pgvector for the closest movies (cosine similarity)
+            5. Filter out already-swiped movies
+            6. Return the top `limit` results
+        """
+
+        # 1. Build mood sentence from answer tags
+        keywords = []
+        for answer in answers:
+            tag_text = self.MOOD_TAGS.get(answer, answer)
+            keywords.append(tag_text)
+
+        mood_sentence = " ".join(keywords)
+        logger.info(f"Smart Discovery for user {user_id}: '{mood_sentence}'")
+
+        # 2. Generate embedding vector for this mood
+        from app.services.embedding_service import embedding_service
+        mood_vector = embedding_service.generate_embedding(mood_sentence)
+
+        if not mood_vector:
+            logger.error("Failed to generate mood vector")
+            return []
+
+        # 3. Query pgvector for semantically similar movies
+        swiped_ids = set(self.supabase_ds.get_user_swiped_movie_ids(user_id))
+
+        # Use the existing match_movies RPC (no user filter — we filter manually)
+        try:
+            # Fetch a larger pool (limit * 6) to allow for variety and filtering
+            response = self.supabase_ds.client.rpc("match_movies_for_user", {
+                "query_embedding": mood_vector,
+                "match_count": limit * 6,  
+                "user_id_param": user_id,
+            }).execute()
+            candidates = response.data if response.data else []
+        except Exception as e:
+            logger.error(f"Smart Discovery vector search failed: {e}")
+            return []
+
+        # 4. Filter swiped + convert to Movie entities
+        pre_filtered = []
+        for m in candidates:
+            if m["id"] in swiped_ids:
+                continue
+            if not m.get("poster_path"):
+                continue
+
+            movie = MovieModel(
+                id=m["id"],
+                name=m.get("name", "Unknown"),
+                genre=m.get("genre", "General"),
+                poster_path=m.get("poster_path"),
+                overview=m.get("overview"),
+                release_date=m.get("release_date"),
+                vote_average=m.get("vote_average", 0),
+            ).to_entity()
+            pre_filtered.append(movie)
+
+        # 5. Shuffle the candidate pool to add variety for the same answers
+        random.shuffle(pre_filtered)
+        results = pre_filtered[:limit]
+
+        logger.info(
+            f"Smart Discovery returned {len(results)} shuffled movies "
+            f"for user {user_id} (from {len(candidates)} candidates)"
+        )
+        return results

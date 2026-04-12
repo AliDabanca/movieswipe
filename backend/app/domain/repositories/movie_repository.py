@@ -27,3 +27,8 @@ class MovieRepository(ABC):
     def swipe(self, movie_id: int, is_like: bool, user_id: str, rating: int | None = None) -> None:
         """Record a swipe action."""
         pass
+
+    @abstractmethod
+    def delete_swipe(self, movie_id: int, user_id: str) -> None:
+        """Delete a swipe record (unlike/unpass)."""
+        pass

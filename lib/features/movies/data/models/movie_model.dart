@@ -68,6 +68,7 @@ class MovieDetailModel extends MovieModel {
   final List<CastMemberModel> castDetails;
   final int voteCount;
   final List<MovieModel> similarMovies;
+  final Map<String, dynamic>? watchProviders;
 
   const MovieDetailModel({
     required super.id,
@@ -88,6 +89,7 @@ class MovieDetailModel extends MovieModel {
     this.castDetails = const [],
     this.voteCount = 0,
     this.similarMovies = const [],
+    this.watchProviders,
   });
 
   /// Create from JSON
@@ -123,6 +125,7 @@ class MovieDetailModel extends MovieModel {
               ?.map((e) => MovieModel.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      watchProviders: json['watch_providers'] as Map<String, dynamic>?,
     );
   }
 

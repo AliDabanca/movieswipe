@@ -8,7 +8,9 @@ abstract class MovieRemoteDataSource {
   Future<List<MovieModel>> getRecommendedMovies(); // NEW: Personalized recommendations
   Future<List<MovieModel>> searchMovies(String query);
   Future<void> swipeMovie(int movieId, bool isLike, String userId, {int? rating});
+  Future<void> deleteSwipe(int movieId);
   Future<MovieDetailModel> getMovieDetails(int movieId);
+  Future<List<MovieModel>> getMoodRecommendations(List<String> answers);
 }
 
 /// Implementation of remote data source
@@ -27,7 +29,7 @@ class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
         throw ServerException(message: 'Invalid response format');
       }
       
-      return (response as List<dynamic>)
+      return response
           .map((json) => MovieModel.fromJson(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
@@ -47,11 +49,11 @@ class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
         
         if (status == 'end_of_content') {
           final message = response['message'] as String? ?? 
-              'Keşfedecek film kalmadı!';
+              'KeÅŸfedecek film kalmadÄ±!';
           throw EndOfContentException(message: message);
         }
         
-        // status == "ok" — parse movies list
+        // status == "ok" â€” parse movies list
         final moviesList = response['movies'] as List<dynamic>? ?? [];
         return moviesList
             .map((json) => MovieModel.fromJson(json as Map<String, dynamic>))
@@ -60,7 +62,7 @@ class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
       
       // Fallback: legacy format (plain list) for backward compatibility
       if (response is List) {
-        return (response as List<dynamic>)
+        return response
             .map((json) => MovieModel.fromJson(json as Map<String, dynamic>))
             .toList();
       }
@@ -81,13 +83,23 @@ class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
         '/movies/$movieId/swipe',
         body: {
           'isLike': isLike,
-          if (rating != null) 'rating': rating,
+          'rating': ?rating,
           // userId now comes from JWT token automatically via ApiClient headers
         },
       );
     } catch (e) {
       if (e is ServerException) rethrow;
       throw ServerException(message: 'Failed to swipe movie: $e');
+    }
+  }
+
+  @override
+  Future<void> deleteSwipe(int movieId) async {
+    try {
+      await apiClient.delete('/movies/$movieId/swipe');
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException(message: 'Failed to delete swipe: $e');
     }
   }
 
@@ -101,7 +113,7 @@ class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
         throw ServerException(message: 'Invalid response format');
       }
       
-      return (response as List<dynamic>)
+      return response
           .map((json) => MovieModel.fromJson(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
@@ -109,6 +121,7 @@ class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
       throw ServerException(message: 'Failed to search movies: $e');
     }
   }
+
   @override
   Future<MovieDetailModel> getMovieDetails(int movieId) async {
     try {
@@ -122,6 +135,34 @@ class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
     } catch (e) {
       if (e is ServerException) rethrow;
       throw ServerException(message: 'Failed to fetch movie details: $e');
+    }
+  }
+
+  @override
+  Future<List<MovieModel>> getMoodRecommendations(List<String> answers) async {
+    try {
+      final response = await apiClient.post(
+        '/recommendations/mood',
+        body: {'answers': answers},
+      );
+
+      if (response is Map<String, dynamic>) {
+        final status = response['status'] as String?;
+
+        if (status == 'end_of_content') {
+          return [];
+        }
+
+        final moviesList = response['movies'] as List<dynamic>? ?? [];
+        return moviesList
+            .map((json) => MovieModel.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
+
+      throw ServerException(message: 'Invalid response format');
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException(message: 'Failed to get mood recommendations: $e');
     }
   }
 }

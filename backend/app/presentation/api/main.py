@@ -11,12 +11,25 @@ from app.core.config import settings
 from app.core.errors import DomainException, NotFoundError, ValidationError
 from app.presentation.api.routes import movies, recommendations, users, sync, search
 
-# Configure logging
+# Configure logging - single handler to avoid duplicate output
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
 )
+# Prevent duplicate log lines from child loggers
+logging.getLogger("movieswipe").propagate = False
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s"))
+movieswipe_logger = logging.getLogger("movieswipe")
+if not movieswipe_logger.handlers:
+    movieswipe_logger.addHandler(handler)
+    movieswipe_logger.setLevel(logging.INFO)
+
 logger = logging.getLogger("movieswipe")
+
+# Suppress noisy third-party loggers
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 @asynccontextmanager

@@ -8,6 +8,7 @@ import 'package:movieswipe/features/movies/presentation/bloc/movies_bloc.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_event.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_state.dart';
 import 'package:movieswipe/features/movies/presentation/widgets/movie_card.dart';
+import 'package:movieswipe/features/movies/presentation/pages/smart_discovery_page.dart';
 
 
 /// Swipe page - main movie swiping interface
@@ -147,7 +148,6 @@ class _SwipePageState extends State<SwipePage> {
                   final userId = Provider.of<AuthProvider>(context, listen: false).currentUserId;
                   
                   if (userId == null) {
-                    print ('❌ No user ID found!');
                     return true;
                   }
 
@@ -203,13 +203,35 @@ class _SwipePageState extends State<SwipePage> {
                 ),
 
                 // Undo button
-                FloatingActionButton(
+                FloatingActionButton.small(
                   heroTag: 'undo',
                   onPressed: () {
                     controller.undo();
                   },
                   backgroundColor: Colors.grey,
-                  child: const Icon(Icons.refresh, size: 28),
+                  child: const Icon(Icons.refresh, size: 22),
+                ),
+
+                // Smart AI Discovery button
+                FloatingActionButton.small(
+                  heroTag: 'smart_discovery',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SmartDiscoveryPage()),
+                    );
+                  },
+                  backgroundColor: const Color(0xFF7C4DFF),
+                  child: ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [Color(0xFFE040FB), Colors.white],
+                    ).createShader(bounds),
+                    child: const Icon(
+                      Icons.auto_awesome,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
                 ),
 
                 // Like button

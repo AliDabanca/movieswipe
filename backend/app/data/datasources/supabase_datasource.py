@@ -25,11 +25,12 @@ def with_retry(max_retries: int = 3, base_delay: float = 0.5):
                     return func(*args, **kwargs)
                 except Exception as e:
                     error_str = str(e).lower()
-                    # Only retry on network/timeout errors
+                    # Only retry on network/timeout/protocol errors
                     is_retryable = any(kw in error_str for kw in [
                         "timeout", "timed out", "connection",
                         "522", "503", "502", "reset",
                         "network", "eof", "broken pipe",
+                        "protocol", "disconnected", "terminated"
                     ])
                     if not is_retryable or attempt == max_retries:
                         raise
@@ -109,15 +110,26 @@ class SupabaseDataSource:
             
     @with_retry()
     def get_movies_by_ids(self, movie_ids: List[int]) -> List[Dict[str, Any]]:
-        """Get multiple movies by their IDs."""
+        """
+        Get multiple movies by their IDs. 
+        Uses chunking to avoid oversized requests/URL limits.
+        """
         if not movie_ids:
             return []
             
+        # Chunk size to avoid 'RemoteProtocolError' or URL length limits (PostgREST/Supabase)
+        CHUNK_SIZE = 50
+        all_movies = []
+        
         try:
-            response = self.client.table("movies").select("*").in_("id", movie_ids).execute()
-            return response.data
+            for i in range(0, len(movie_ids), CHUNK_SIZE):
+                chunk = movie_ids[i:i + CHUNK_SIZE]
+                response = self.client.table("movies").select("*").in_("id", chunk).execute()
+                all_movies.extend(response.data)
+            
+            return all_movies
         except Exception as e:
-            logger.error(f"Supabase batch fetch error (ids: {movie_ids}): {str(e)}", exc_info=True)
+            logger.error(f"Supabase batch fetch error (total ids: {len(movie_ids)}): {str(e)}", exc_info=True)
             raise ServerError("Failed to fetch movies")
     
     @with_retry()
@@ -142,6 +154,19 @@ class SupabaseDataSource:
         except Exception as e:
             logger.error(f"Supabase swipe save error: {str(e)}", exc_info=True)
             raise ServerError("Failed to save swipe")
+
+    def delete_swipe(self, user_id: str, movie_id: int) -> None:
+        """Delete a swipe record (unlike/unpass)."""
+        try:
+            self.client.table("user_swipes")\
+                .delete()\
+                .eq("user_id", user_id)\
+                .eq("movie_id", movie_id)\
+                .execute()
+            logger.info(f"Deleted swipe for user {user_id} on movie {movie_id}")
+        except Exception as e:
+            logger.error(f"Supabase swipe deletion error: {str(e)}", exc_info=True)
+            raise ServerError("Failed to delete swipe")
     
     def get_user_swipes(self, user_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         """Get all swipes for a user."""

@@ -63,6 +63,20 @@ class CastMember(BaseModel):
     profile_path: str | None = Field(None, description="TMDB profile image path")
 
 
+class WatchProviderModel(BaseModel):
+    """Single streaming/watch provider."""
+    provider_id: int = Field(..., description="TMDB provider ID")
+    provider_name: str = Field(..., description="Provider name (e.g. Netflix)")
+    logo_path: str | None = Field(None, description="TMDB logo path")
+    provider_type: str = Field(..., description="flatrate, rent, or buy")
+
+
+class WatchProvidersResponse(BaseModel):
+    """Response model for watch providers endpoint."""
+    providers: list[WatchProviderModel] = Field(default_factory=list)
+    tmdb_link: str = Field("", description="TMDB page link for this movie's providers")
+
+
 class MovieDetailModel(MovieModel):
     """Extended movie model with full details for the detail page."""
     
@@ -76,20 +90,7 @@ class MovieDetailModel(MovieModel):
     cast_details: list[CastMember] = Field(default_factory=list, description="Cast with character info")
     vote_count: int = Field(0, description="Number of votes")
     similar_movies: list[MovieModel] = Field(default_factory=list, description="Similar movies")
+    watch_providers: WatchProvidersResponse | None = Field(None, description="Streaming/Watch providers information")
 
     class Config:
         from_attributes = True
-
-
-class WatchProviderModel(BaseModel):
-    """Single streaming/watch provider."""
-    provider_id: int = Field(..., description="TMDB provider ID")
-    provider_name: str = Field(..., description="Provider name (e.g. Netflix)")
-    logo_path: str | None = Field(None, description="TMDB logo path")
-    provider_type: str = Field(..., description="flatrate, rent, or buy")
-
-
-class WatchProvidersResponse(BaseModel):
-    """Response model for watch providers endpoint."""
-    providers: list[WatchProviderModel] = Field(default_factory=list)
-    tmdb_link: str = Field("", description="TMDB page link for this movie's providers")
