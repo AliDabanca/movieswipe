@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:get_it/get_it.dart';
+import 'package:provider/provider.dart';
 import 'package:movieswipe/features/movies/domain/entities/movie.dart';
 import 'package:movieswipe/features/movies/data/models/movie_model.dart';
 import 'package:movieswipe/features/movies/data/datasources/movie_remote_datasource.dart';
@@ -37,7 +38,11 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   void initState() {
     super.initState();
     _loadDetails();
-    _localRating = widget.movie.userRating;
+    // Check LikedMoviesProvider for the most up-to-date rating first,
+    // since widget.movie.userRating may be stale (e.g. from AI results list).
+    final providerRating = Provider.of<LikedMoviesProvider>(context, listen: false)
+        .getMovieRating(widget.movie.id);
+    _localRating = providerRating ?? widget.movie.userRating;
   }
 
   Future<void> _loadDetails() async {
@@ -77,11 +82,20 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       );
       
       if (mounted) {
-        context.read<LikedMoviesProvider>().updateMovieRating(widget.movie.id, rating);
-        context.read<MoviesBloc>().add(UpdateMovieRatingEvent(
-          movieId: widget.movie.id,
-          rating: rating,
-        ));
+        final likedProvider = context.read<LikedMoviesProvider>();
+        // Ensure movie is in liked list before updating rating
+        likedProvider.addLikedMovie(widget.movie);
+        likedProvider.updateMovieRating(widget.movie.id, rating);
+        
+        // MoviesBloc may not be available if we navigated from SmartDiscoveryPage
+        try {
+          context.read<MoviesBloc>().add(UpdateMovieRatingEvent(
+            movieId: widget.movie.id,
+            rating: rating,
+          ));
+        } catch (_) {
+          // MoviesBloc not in widget tree — swipe page sync skipped, that's OK
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -758,14 +772,23 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   Widget _buildSimilarMovieCard(MovieModel movie) {
     return GestureDetector(
       onTap: () {
+        // MoviesBloc may not be available (e.g. from SmartDiscoveryPage)
+        MoviesBloc? bloc;
+        try {
+          bloc = context.read<MoviesBloc>();
+        } catch (_) {}
+
+        Widget destination = MovieDetailPage(movie: movie.toEntity());
+        if (bloc != null) {
+          destination = BlocProvider.value(
+            value: bloc,
+            child: destination,
+          );
+        }
+
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => BlocProvider.value(
-              value: context.read<MoviesBloc>(),
-              child: MovieDetailPage(movie: movie.toEntity()),
-            ),
-          ),
+          MaterialPageRoute(builder: (_) => destination),
         );
       },
       child: Container(

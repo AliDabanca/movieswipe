@@ -126,9 +126,16 @@ class _MyListContentState extends State<_MyListContent> {
                 IconButton(
                   onPressed: () {
                     final provider = context.read<LikedMoviesProvider>();
+                    // Collect all liked movies, deduplicating by ID
+                    final seenIds = <int>{};
                     final allMovies = <Map<String, dynamic>>[];
                     for (final movies in provider.moviesByGenre.values) {
-                      allMovies.addAll(movies);
+                      for (final movie in movies) {
+                        final id = movie['id'] as int;
+                        if (seenIds.add(id)) {
+                          allMovies.add(movie);
+                        }
+                      }
                     }
 
                     if (allMovies.isNotEmpty) {

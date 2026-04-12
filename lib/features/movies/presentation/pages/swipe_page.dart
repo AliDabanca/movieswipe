@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
@@ -23,6 +24,8 @@ class _SwipePageState extends State<SwipePage> {
   CardSwiperController controller = CardSwiperController();
   // Key to force-rebuild CardSwiper when new batch arrives
   int _swiperGeneration = 0;
+  // Track the current batch's movie IDs to distinguish new batches from rating updates
+  List<int> _currentBatchIds = [];
 
   @override
   void dispose() {
@@ -35,12 +38,20 @@ class _SwipePageState extends State<SwipePage> {
     return BlocListener<MoviesBloc, MoviesState>(
       listener: (context, state) {
         if (state is MoviesLoaded) {
-          // New batch arrived — rebuild the swiper with a fresh controller
-          setState(() {
-            controller.dispose();
-            controller = CardSwiperController();
-            _swiperGeneration++;
-          });
+          // Check if this is a genuinely new batch or just a rating update
+          final newIds = state.movies.map((m) => m.id).toList();
+                    final isSameBatch = listEquals(newIds, _currentBatchIds);
+
+          if (!isSameBatch) {
+            // New batch arrived — rebuild the swiper with a fresh controller
+            setState(() {
+              controller.dispose();
+              controller = CardSwiperController();
+              _swiperGeneration++;
+              _currentBatchIds = newIds;
+            });
+          }
+          // If same batch (e.g. rating update), do nothing — swiper keeps its position
         }
       },
       child: BlocBuilder<MoviesBloc, MoviesState>(

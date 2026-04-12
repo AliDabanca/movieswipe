@@ -22,7 +22,7 @@ class _SmartDiscoveryPageState extends State<SmartDiscoveryPage>
   List<MovieModel> _results = [];
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  final Set<int> _locallyLikedIds = {};
+  // No longer using local Set, checking LikedMoviesProvider instead
 
   static const _questions = [
     _Question(
@@ -114,13 +114,12 @@ class _SmartDiscoveryPageState extends State<SmartDiscoveryPage>
   }
 
   Future<void> _toggleLikeMovie(MovieModel movie) async {
-    final isCurrentlyLiked = _locallyLikedIds.contains(movie.id);
-    final datasource = MovieRemoteDataSourceImpl(apiClient: ApiClient());
     final likedMoviesProvider = Provider.of<LikedMoviesProvider>(context, listen: false);
+    final isCurrentlyLiked = likedMoviesProvider.isMovieLiked(movie.id);
+    final datasource = MovieRemoteDataSourceImpl(apiClient: ApiClient());
 
     if (isCurrentlyLiked) {
       // 💔 UNLIKE logic
-      setState(() => _locallyLikedIds.remove(movie.id));
       likedMoviesProvider.removeLikedMovie(movie.id);
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -137,7 +136,6 @@ class _SmartDiscoveryPageState extends State<SmartDiscoveryPage>
       } catch (e) {
         // Rollback on error
         if (mounted) {
-          setState(() => _locallyLikedIds.add(movie.id));
           likedMoviesProvider.addLikedMovie(movie);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('İşlem başarısız oldu, tekrar dene.')),
@@ -146,7 +144,6 @@ class _SmartDiscoveryPageState extends State<SmartDiscoveryPage>
       }
     } else {
       // ❤️ LIKE logic
-      setState(() => _locallyLikedIds.add(movie.id));
       likedMoviesProvider.addLikedMovie(movie);
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -164,7 +161,6 @@ class _SmartDiscoveryPageState extends State<SmartDiscoveryPage>
       } catch (e) {
         // Rollback on error
         if (mounted) {
-          setState(() => _locallyLikedIds.remove(movie.id));
           likedMoviesProvider.removeLikedMovie(movie.id);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('İşlem başarısız oldu, tekrar dene.')),
@@ -358,23 +354,24 @@ class _SmartDiscoveryPageState extends State<SmartDiscoveryPage>
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: _results.length,
             separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final movie = _results[index];
-              return _MovieResultTile(
-                movie: movie,
-                index: index,
-                isLiked: _locallyLikedIds.contains(movie.id),
-                onLike: () => _toggleLikeMovie(movie),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => MovieDetailPage(movie: movie.toEntity()),
-                    ),
-                  );
-                },
-              );
-            },
+          itemBuilder: (context, index) {
+            final movie = _results[index];
+            final likedProvider = context.watch<LikedMoviesProvider>();
+            return _MovieResultTile(
+              movie: movie,
+              index: index,
+              isLiked: likedProvider.isMovieLiked(movie.id),
+              onLike: () => _toggleLikeMovie(movie),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => MovieDetailPage(movie: movie.toEntity()),
+                  ),
+                );
+              },
+            );
+          },
           ),
         ),
         Padding(

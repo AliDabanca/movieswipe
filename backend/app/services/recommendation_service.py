@@ -636,8 +636,14 @@ class RecommendationService:
         swipe_map = {s["movie_id"]: s for s in liked_swipes.data}
         movie_map = {m["id"]: m for m in movies_data}
         
+        # Deduplicate: track seen movie IDs to prevent duplicates
+        seen_ids = set()
         formatted_movies = []
         for m_id in liked_movie_ids:
+            if m_id in seen_ids:
+                continue
+            seen_ids.add(m_id)
+            
             if m_id not in movie_map:
                 continue
                 

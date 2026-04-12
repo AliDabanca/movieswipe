@@ -43,6 +43,7 @@ class LikedMoviesProvider extends ChangeNotifier {
   // Loading state
   bool _isLoaded = false;
   bool _isLoading = false;
+  bool _isInitialized = false;  // becomes true once loadFromApi is first called
 
   // Counters (Persistent via SharedPreferences)
   int _smartDiscoveryCount = 0;
@@ -65,12 +66,37 @@ class LikedMoviesProvider extends ChangeNotifier {
   String? get currentMood => _currentMood;
   String? get currentEmoji => _currentEmoji;
   bool get isLoaded => _isLoaded;
-  bool get isLoading => _isLoading;
+  /// Returns true if data is actively loading OR if loadFromApi hasn't been called yet.
+  /// This prevents the UI from briefly showing empty state on startup.
+  bool get isLoading => _isLoading || !_isInitialized;
   SortCriteria get currentSortCriteria => _currentSortCriteria;
 
   // Counter Getters
   int get smartDiscoveryCount => _smartDiscoveryCount;
   int get moodDiscoveryCount => _moodDiscoveryCount;
+
+  /// Look up the current user rating for a movie by its ID.
+  /// Returns null if the movie is not in the liked list or has no rating.
+  int? getMovieRating(int movieId) {
+    for (final movies in _moviesByGenre.values) {
+      for (final m in movies) {
+        if (m['id'] == movieId) {
+          return m['user_rating'] as int?;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Check if a movie is already in the liked list.
+  bool isMovieLiked(int movieId) {
+    for (final movies in _moviesByGenre.values) {
+      if (movies.any((m) => m['id'] == movieId)) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   /// Dynamic title based on top genre
   String get movieDnaTitle {
@@ -377,6 +403,7 @@ class LikedMoviesProvider extends ChangeNotifier {
   Future<void> loadFromApi(String userId) async {
     if (_isLoading) return;
     _isLoading = true;
+    _isInitialized = true;
     notifyListeners();
 
     // Step 1: Load from cache immediately
@@ -536,22 +563,38 @@ class LikedMoviesProvider extends ChangeNotifier {
       'user_rating': movie.userRating,
     };
 
+    // Check if movie already exists in this genre's list
+    bool alreadyExists = false;
     if (_moviesByGenre.containsKey(genre)) {
-      _moviesByGenre[genre]!.insert(0, movieMap);
+      final existingIndex = _moviesByGenre[genre]!.indexWhere((m) => m['id'] == movie.id);
+      if (existingIndex != -1) {
+        // Movie already in the list — update its data in place
+        _moviesByGenre[genre]![existingIndex] = movieMap;
+        alreadyExists = true;
+      } else {
+        _moviesByGenre[genre]!.insert(0, movieMap);
+      }
     } else {
       _moviesByGenre[genre] = [movieMap];
     }
     
-    // Add to recently added and keep up to 10
-    _recentlyAddedAll.insert(0, movieMap);
-    if (_recentlyAddedAll.length > 10) {
-      _recentlyAddedAll.removeLast();
+    // Guard recentlyAddedAll against duplicates too
+    final recentIndex = _recentlyAddedAll.indexWhere((m) => m['id'] == movie.id);
+    if (recentIndex != -1) {
+      _recentlyAddedAll[recentIndex] = movieMap;
+    } else {
+      _recentlyAddedAll.insert(0, movieMap);
+      if (_recentlyAddedAll.length > 10) {
+        _recentlyAddedAll.removeLast();
+      }
     }
 
-    // Update stats
-    _totalSwipes++;
-    _totalLikes++;
-    _recalculateTopGenres();
+    // Only increment stats if this is a genuinely new like, not a re-swipe
+    if (!alreadyExists) {
+      _totalSwipes++;
+      _totalLikes++;
+      _recalculateTopGenres();
+    }
     notifyListeners();
   }
 
