@@ -198,10 +198,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                 ],
                 const SizedBox(height: 20),
                 _buildOverview(d),
-                if (_watchProvidersData != null) ...[
-                  const SizedBox(height: 24),
-                  _buildWatchProviders(),
-                ],
+                const SizedBox(height: 24),
+                _buildWatchProviders(),
                 if (d.director != null) ...[
                   const SizedBox(height: 24),
                   _buildDirector(d.director!),
@@ -503,8 +501,6 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     final providers = (_watchProvidersData?['providers'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final tmdbLink = _watchProvidersData?['tmdb_link'] as String?;
 
-    if (providers.isEmpty) return const SizedBox.shrink();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -540,18 +536,28 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           ],
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 48,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: providers.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final p = providers[index];
-              return _buildProviderChip(p);
-            },
+        if (providers.isNotEmpty)
+          SizedBox(
+            height: 48,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: providers.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final p = providers[index];
+                return _buildProviderChip(p);
+              },
+            ),
+          )
+        else
+          Text(
+            'Bu film için izleme bilgisi bulunamadı.',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.5),
+              fontSize: 13,
+              fontStyle: FontStyle.italic,
+            ),
           ),
-        ),
       ],
     );
   }
