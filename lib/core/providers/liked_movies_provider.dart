@@ -553,6 +553,15 @@ class LikedMoviesProvider extends ChangeNotifier {
   /// Optimistically add a liked movie (called immediately on swipe right)
   void addLikedMovie(Movie movie) {
     final genre = movie.genre;
+    // Check if we already have a rating for this movie in memory to prevent overwriting with 0/null
+    var finalRating = movie.userRating;
+    if (finalRating == null || finalRating == 0) {
+      final existingRating = getMovieRating(movie.id);
+      if (existingRating != null && existingRating > 0) {
+        finalRating = existingRating;
+      }
+    }
+
     final movieMap = {
       'id': movie.id,
       'name': movie.name,
@@ -560,7 +569,7 @@ class LikedMoviesProvider extends ChangeNotifier {
       'poster_path': movie.posterPath,
       'vote_average': movie.voteAverage,
       'release_date': movie.releaseDate,
-      'user_rating': movie.userRating,
+      'user_rating': finalRating,
     };
 
     // Check if movie already exists in this genre's list

@@ -83,9 +83,9 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       
       if (mounted) {
         final likedProvider = context.read<LikedMoviesProvider>();
-        // Ensure movie is in liked list before updating rating
-        likedProvider.addLikedMovie(widget.movie);
-        likedProvider.updateMovieRating(widget.movie.id, rating);
+        // Pass a movie copy with the correct rating so it's stored correctly from the start
+        final ratedMovie = widget.movie.copyWith(userRating: rating);
+        likedProvider.addLikedMovie(ratedMovie);
         
         // MoviesBloc may not be available if we navigated from SmartDiscoveryPage
         try {

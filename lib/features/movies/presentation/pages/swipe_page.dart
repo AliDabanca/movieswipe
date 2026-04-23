@@ -164,8 +164,16 @@ class _SwipePageState extends State<SwipePage> {
 
                   // Optimistic UI update - update local state immediately
                   final likedMoviesProvider = Provider.of<LikedMoviesProvider>(context, listen: false);
+                  
+                  // Crucial: Fetch the latest rating from provider in case it was updated in DetailPage
+                  final currentRating = likedMoviesProvider.getMovieRating(movie.id) ?? movie.userRating;
+
                   if (isLike) {
-                    likedMoviesProvider.addLikedMovie(movie);
+                    // Use a movie copy with the most up-to-date rating
+                    final movieWithRating = currentRating != null && currentRating != movie.userRating
+                        ? movie.copyWith(userRating: currentRating)
+                        : movie;
+                    likedMoviesProvider.addLikedMovie(movieWithRating);
                   } else {
                     likedMoviesProvider.addPass();
                   }
@@ -175,7 +183,7 @@ class _SwipePageState extends State<SwipePage> {
                           movieId: movie.id,
                           isLike: isLike,
                           userId: userId,
-                          rating: movie.userRating,
+                          rating: currentRating,
                         ),
                       );
                   return true;
