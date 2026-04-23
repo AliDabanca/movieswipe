@@ -58,16 +58,23 @@ class MyApp extends StatelessWidget {
                 body: Center(child: CircularProgressIndicator()),
               );
             }
+
+            // Not authenticated → login
+            // Also covers the needsEmailConfirmation state:
+            // signUp signs the user out, so isAuthenticated is false,
+            // and the register page handles showing the email confirmation UI.
+            if (!auth.isAuthenticated) {
+              return const LoginPage();
+            }
+
             // Authenticated but no username yet → username selection
-            if (auth.isAuthenticated && !auth.hasProfile) {
+            // This only happens AFTER the user has confirmed email and signed in.
+            if (!auth.hasProfile) {
               return const UsernamePage();
             }
+
             // Authenticated with profile → main app
-            if (auth.isAuthenticated && auth.hasProfile) {
-              return const MainNavigation();
-            }
-            // Not authenticated → login
-            return const LoginPage();
+            return const MainNavigation();
           },
         ),
       ),

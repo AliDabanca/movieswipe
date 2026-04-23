@@ -1,11 +1,11 @@
 -- ============================================
--- FIX: Profiles Table RLS Policies
+-- FIX: Profiles Table RLS Policies (v2)
 -- ============================================
 -- Run in Supabase Dashboard → SQL Editor
 -- 
--- Problem: "new row violates row-level security 
---           policy for table profiles"
--- Root cause: INSERT policy missing or broken
+-- Problems fixed:
+--   1. "new row violates row-level security policy for table profiles"
+--   2. upsert (INSERT ... ON CONFLICT UPDATE) support
 -- ============================================
 
 -- Step 1: Drop ALL existing policies to start clean
@@ -29,14 +29,17 @@ CREATE POLICY "Profiles are viewable by everyone"
     USING (true);
 
 -- INSERT: Authenticated users can create their OWN profile only
+-- Uses auth.uid() which returns the JWT user ID
 CREATE POLICY "Users can create their own profile"
     ON profiles FOR INSERT
     WITH CHECK (auth.uid() = id);
 
 -- UPDATE: Users can update their OWN profile only
+-- This is also needed for upsert (INSERT ... ON CONFLICT DO UPDATE)
 CREATE POLICY "Users can update their own profile"
     ON profiles FOR UPDATE
-    USING (auth.uid() = id);
+    USING (auth.uid() = id)
+    WITH CHECK (auth.uid() = id);
 
 -- Step 4: Verify policies
 SELECT policyname, cmd, permissive, qual, with_check
