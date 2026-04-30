@@ -7,6 +7,7 @@ import 'package:movieswipe/core/providers/auth_provider.dart';
 import 'package:movieswipe/core/providers/liked_movies_provider.dart';
 import 'package:movieswipe/features/auth/presentation/pages/login_page.dart';
 import 'package:movieswipe/features/auth/presentation/pages/username_page.dart';
+import 'package:movieswipe/features/onboarding/presentation/pages/onboarding_page.dart';
 import 'package:movieswipe/features/navigation/main_navigation.dart';
 
 void main() async {
@@ -68,12 +69,16 @@ class MyApp extends StatelessWidget {
             }
 
             // Authenticated but no username yet → username selection
-            // This only happens AFTER the user has confirmed email and signed in.
             if (!auth.hasProfile) {
               return const UsernamePage();
             }
 
-            // Authenticated with profile → main app
+            // Authenticated with profile but onboarding not done → onboarding
+            if (!auth.onboardingCompleted) {
+              return const OnboardingPage();
+            }
+
+            // Authenticated with profile, onboarding done → main app
             return const MainNavigation();
           },
         ),

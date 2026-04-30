@@ -14,6 +14,7 @@ class AuthProvider extends ChangeNotifier {
   bool _hasProfile = false;
   bool _profileChecked = false;
   bool _needsEmailConfirmation = false;
+  bool _onboardingCompleted = false;
 
   /// Guards against concurrent auth operations
   bool _isAuthOperationInProgress = false;
@@ -36,6 +37,7 @@ class AuthProvider extends ChangeNotifier {
   List<int> get pinnedMovieIds => _pinnedMovieIds;
   bool get hasProfile => _hasProfile;
   bool get profileChecked => _profileChecked;
+  bool get onboardingCompleted => _onboardingCompleted;
   bool get needsEmailConfirmation => _needsEmailConfirmation;
 
   SupabaseClient get _client => Supabase.instance.client;
@@ -88,7 +90,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       final response = await _client
           .from('profiles')
-          .select('username, display_name, avatar_url, cover_photo_url, pinned_movie_ids')
+          .select('username, display_name, avatar_url, cover_photo_url, pinned_movie_ids, onboarding_completed')
           .eq('id', _user!.id)
           .maybeSingle();
 
@@ -98,10 +100,12 @@ class AuthProvider extends ChangeNotifier {
         _avatarUrl = response['avatar_url'] as String?;
         _coverPhotoUrl = response['cover_photo_url'] as String?;
         _pinnedMovieIds = List<int>.from(response['pinned_movie_ids'] ?? []);
+        _onboardingCompleted = response['onboarding_completed'] as bool? ?? false;
         _hasProfile = _username != null;
       } else {
         _hasProfile = false;
         _username = null;
+        _onboardingCompleted = false;
       }
     } catch (e) {
       debugPrint('Profile check error: $e');
@@ -293,6 +297,20 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Mark onboarding as completed in Supabase and locally
+  Future<void> completeOnboarding() async {
+    if (_user == null) return;
+    try {
+      await _client.from('profiles').update(
+        {'onboarding_completed': true},
+      ).eq('id', _user!.id);
+      _onboardingCompleted = true;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Failed to mark onboarding completed: $e');
+    }
+  }
+
   Future<void> signOut() async {
     await _client.auth.signOut();
     _user = null;
@@ -301,6 +319,7 @@ class AuthProvider extends ChangeNotifier {
     _avatarUrl = null;
     _coverPhotoUrl = null;
     _hasProfile = false;
+    _onboardingCompleted = false;
     _profileChecked = true;
     notifyListeners();
   }
