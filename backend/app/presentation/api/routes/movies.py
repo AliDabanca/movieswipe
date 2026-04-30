@@ -7,7 +7,7 @@ import asyncio
 from app.domain.repositories.movie_repository import MovieRepository
 from app.data.models.movie_model import MovieModel, MovieDetailModel, WatchProviderModel, WatchProvidersResponse
 from app.presentation.api.dependencies import get_movie_repository
-from app.presentation.schemas.requests import SwipeRequest, MessageResponse
+from app.presentation.schemas.requests import SwipeRequest, MessageResponse, WatchStatusRequest, VALID_WATCH_STATUSES
 from app.core.errors import NotFoundError
 from app.core.auth import get_current_user_id
 from app.data.services.tmdb_service import TMDBService
@@ -310,4 +310,34 @@ def delete_swipe(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete swipe",
+        )
+
+
+@router.patch("/{movie_id}/watch-status", response_model=MessageResponse)
+def update_watch_status(
+    movie_id: int,
+    request: WatchStatusRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    """
+    Update the watch status for a movie (watched, watch_later, favorite, dropped).
+    Send null to clear the status.
+    """
+    # Validate status value
+    if request.watch_status is not None and request.watch_status not in VALID_WATCH_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid watch_status. Must be one of: {', '.join(VALID_WATCH_STATUSES)}",
+        )
+
+    try:
+        ds = SupabaseDataSource()
+        ds.update_watch_status(user_id, movie_id, request.watch_status)
+        status_text = request.watch_status or 'cleared'
+        return MessageResponse(message=f"Watch status updated to '{status_text}'")
+    except Exception as e:
+        logger.error(f"Failed to update watch status for user {user_id}, movie {movie_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update watch status",
         )

@@ -54,6 +54,27 @@ class ApiClient {
     }
   }
 
+  /// PATCH request
+  Future<dynamic> patch(
+    String endpoint, {
+    Map<String, dynamic>? body,
+  }) async {
+    try {
+      final url = Uri.parse('${EnvConfig.baseUrl}$endpoint');
+      final response = await _client
+          .patch(
+            url,
+            headers: _headers,
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(Duration(milliseconds: EnvConfig.apiTimeout));
+
+      return _handleResponse(response);
+    } catch (e) {
+      throw NetworkException(message: 'Failed to connect to server: $e');
+    }
+  }
+
   /// DELETE request
   Future<dynamic> delete(String endpoint) async {
     try {

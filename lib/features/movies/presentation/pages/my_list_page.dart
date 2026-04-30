@@ -532,6 +532,8 @@ class _MyListContentState extends State<_MyListContent> {
   Widget _buildMovieCard(dynamic movie, int index) {
     final posterPath = movie['poster_path'] as String?;
     final movieName = movie['name'] as String;
+    final movieId = movie['id'] as int;
+    final watchStatus = movie['watch_status'] as String?;
     final posterUrl = posterPath != null 
         ? 'https://image.tmdb.org/t/p/w500$posterPath'
         : null;
@@ -559,6 +561,7 @@ class _MyListContentState extends State<_MyListContent> {
               ),
             );
         },
+        onLongPress: () => _showWatchStatusSheet(context, movieId, watchStatus),
         child: Container(
           width: 150,
           margin: const EdgeInsets.only(right: 16),
@@ -576,51 +579,93 @@ class _MyListContentState extends State<_MyListContent> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: posterUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: posterUrl,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        placeholder: (context, url) => Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                const Color(0xFF6366F1).withValues(alpha: 0.3),
-                                const Color(0xFFEC4899).withValues(alpha: 0.3)
-                              ],
+              child: Stack(
+                children: [
+                  // Poster
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: posterUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: posterUrl,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            placeholder: (context, url) => Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    const Color(0xFF6366F1).withValues(alpha: 0.3),
+                                    const Color(0xFFEC4899).withValues(alpha: 0.3)
+                                  ],
+                                ),
+                              ),
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              ),
                             ),
-                          ),
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
+                            errorWidget: (context, url, error) => Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Color(0xFF6366F1), Color(0xFFEC4899)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                              ),
+                              child: const Icon(Icons.movie,
+                                  size: 50, color: Colors.white),
                             ),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Color(0xFF6366F1), Color(0xFFEC4899)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
+                          )
+                        : Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0xFF6366F1), Color(0xFFEC4899)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
                             ),
+                            child: const Icon(Icons.movie, size: 50, color: Colors.white),
                           ),
-                          child: const Icon(Icons.movie,
-                              size: 50, color: Colors.white),
-                        ),
-                      )
-                    : Container(
+                  ),
+                  // Watch status chip
+                  if (watchStatus != null)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF6366F1), Color(0xFFEC4899)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          color: _watchStatusMeta(watchStatus)['color'] as Color,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.4),
+                              blurRadius: 4,
+                            ),
+                          ],
                         ),
-                        child: const Icon(Icons.movie, size: 50, color: Colors.white),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _watchStatusMeta(watchStatus)['emoji'] as String,
+                              style: const TextStyle(fontSize: 10),
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              _watchStatusMeta(watchStatus)['short'] as String,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                    ),
+                ],
               ),
             ),
             const SizedBox(height: 8),
@@ -650,4 +695,104 @@ class _MyListContentState extends State<_MyListContent> {
     ),
   );
 }
+
+  void _showWatchStatusSheet(BuildContext context, int movieId, String? currentStatus) {
+    final statuses = [
+      {'key': 'watched', 'emoji': '✅', 'label': 'İzledim', 'color': const Color(0xFF4CAF50)},
+      {'key': 'watch_later', 'emoji': '⏰', 'label': 'Sonra İzle', 'color': const Color(0xFF42A5F5)},
+      {'key': 'favorite', 'emoji': '⭐', 'label': 'Favori', 'color': const Color(0xFFFFB300)},
+      {'key': 'dropped', 'emoji': '🚫', 'label': 'Bıraktım', 'color': const Color(0xFFEF5350)},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1a1a2e),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'İzleme Durumu',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...statuses.map((s) {
+              final isActive = currentStatus == s['key'];
+              return ListTile(
+                leading: Text(s['emoji'] as String, style: const TextStyle(fontSize: 22)),
+                title: Text(
+                  s['label'] as String,
+                  style: TextStyle(
+                    color: isActive ? (s['color'] as Color) : Colors.white,
+                    fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                trailing: isActive
+                    ? Icon(Icons.check_circle, color: s['color'] as Color, size: 22)
+                    : null,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                tileColor: isActive
+                    ? (s['color'] as Color).withValues(alpha: 0.15)
+                    : Colors.transparent,
+                onTap: () {
+                  final newStatus = isActive ? null : s['key'] as String;
+                  context.read<LikedMoviesProvider>().updateWatchStatus(movieId, newStatus);
+                  Navigator.pop(ctx);
+                },
+              );
+            }),
+            if (currentStatus != null) ...[
+              const Divider(color: Colors.white12),
+              ListTile(
+                leading: const Icon(Icons.close, color: Colors.white38),
+                title: const Text(
+                  'Durumu Kaldır',
+                  style: TextStyle(color: Colors.white38),
+                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onTap: () {
+                  context.read<LikedMoviesProvider>().updateWatchStatus(movieId, null);
+                  Navigator.pop(ctx);
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Map<String, dynamic> _watchStatusMeta(String status) {
+    switch (status) {
+      case 'watched':
+        return {'emoji': '✅', 'short': 'İzledim', 'color': const Color(0xFF4CAF50)};
+      case 'watch_later':
+        return {'emoji': '⏰', 'short': 'Sonra', 'color': const Color(0xFF42A5F5)};
+      case 'favorite':
+        return {'emoji': '⭐', 'short': 'Favori', 'color': const Color(0xFFFFB300)};
+      case 'dropped':
+        return {'emoji': '🚫', 'short': 'Bıraktım', 'color': const Color(0xFFEF5350)};
+      default:
+        return {'emoji': '', 'short': '', 'color': Colors.transparent};
+    }
+  }
 }
+

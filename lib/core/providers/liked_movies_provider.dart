@@ -675,6 +675,41 @@ class LikedMoviesProvider extends ChangeNotifier {
     }
   }
 
+  /// Update the watch status for a movie and sync with backend
+  Future<void> updateWatchStatus(int movieId, String? watchStatus) async {
+    // Optimistic local update
+    _setLocalWatchStatus(movieId, watchStatus);
+    notifyListeners();
+
+    // API call
+    try {
+      await _apiClient.patch(
+        '/movies/$movieId/watch-status',
+        body: {'watch_status': watchStatus},
+      );
+    } catch (e) {
+      debugPrint('Failed to update watch status: $e');
+      // Rollback on failure
+      _setLocalWatchStatus(movieId, null);
+      notifyListeners();
+    }
+  }
+
+  void _setLocalWatchStatus(int movieId, String? status) {
+    for (var i = 0; i < _recentlyAddedAll.length; i++) {
+      if (_recentlyAddedAll[i]['id'] == movieId) {
+        _recentlyAddedAll[i]['watch_status'] = status;
+      }
+    }
+    _moviesByGenre.forEach((genre, list) {
+      for (var i = 0; i < list.length; i++) {
+        if (list[i]['id'] == movieId) {
+          list[i]['watch_status'] = status;
+        }
+      }
+    });
+  }
+
   /// Rollback a liked movie if API call fails
   void rollbackLikedMovie(Movie movie) {
     final genre = movie.genre;

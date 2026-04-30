@@ -168,6 +168,19 @@ class SupabaseDataSource:
             logger.error(f"Supabase swipe deletion error: {str(e)}", exc_info=True)
             raise ServerError("Failed to delete swipe")
     
+    def update_watch_status(self, user_id: str, movie_id: int, watch_status: str | None) -> None:
+        """Update the watch status for a user's swipe record."""
+        try:
+            self.client.table("user_swipes")\
+                .update({"watch_status": watch_status})\
+                .eq("user_id", user_id)\
+                .eq("movie_id", movie_id)\
+                .execute()
+            logger.info(f"Updated watch status for user {user_id} on movie {movie_id} to '{watch_status}'")
+        except Exception as e:
+            logger.error(f"Supabase watch status update error: {str(e)}", exc_info=True)
+            raise ServerError("Failed to update watch status")
+    
     def get_user_swipes(self, user_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         """Get all swipes for a user."""
         try:

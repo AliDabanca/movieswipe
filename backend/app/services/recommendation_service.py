@@ -654,7 +654,7 @@ class RecommendationService:
     def get_liked_movies_by_genre(self, user_id: str) -> Dict[str, Any]:
         """Get user's liked movies grouped by genre and the recent 10 additions."""
         liked_swipes = self.supabase_ds.client.table("user_swipes")\
-            .select("movie_id, swiped_at, rating")\
+            .select("movie_id, swiped_at, rating, watch_status")\
             .eq("user_id", user_id)\
             .eq("is_like", True)\
             .order("swiped_at", desc=True)\
@@ -696,7 +696,8 @@ class RecommendationService:
                 "poster_path": movie.get("poster_path"),
                 "vote_average": movie.get("vote_average", 0.0),
                 "release_date": movie.get("release_date"),
-                "user_rating": swipe.get("rating")
+                "user_rating": swipe.get("rating"),
+                "watch_status": swipe.get("watch_status"),
             })
             
         recently_added = formatted_movies[:10]
