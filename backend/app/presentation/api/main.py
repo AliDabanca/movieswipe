@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.errors import DomainException, NotFoundError, ValidationError
-from app.presentation.api.routes import movies, recommendations, users, sync, search
+from app.presentation.api.routes import movies, recommendations, users, sync, search, social
 
 # Configure logging - single handler to avoid duplicate output
 logging.basicConfig(
@@ -95,10 +95,19 @@ async def domain_exception_handler(request: Request, exc: DomainException):
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     """Handle unexpected exceptions."""
+    from app.core.errors import ServerError
+    
+    if isinstance(exc, ServerError):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.message},
+        )
+        
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "Internal server error"},
     )
+
 
 
 # Root endpoint
@@ -125,3 +134,4 @@ app.include_router(recommendations.router)
 app.include_router(users.router)
 app.include_router(sync.router)
 app.include_router(search.router)
+app.include_router(social.router)
