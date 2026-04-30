@@ -9,6 +9,7 @@ import 'package:movieswipe/features/movies/data/datasources/movie_remote_datasou
 import 'package:movieswipe/core/network/api_client.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:movieswipe/core/providers/liked_movies_provider.dart';
+import 'package:movieswipe/core/providers/collections_provider.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_bloc.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_event.dart';
 
@@ -192,6 +193,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                 _buildMetadataChips(d),
                 const SizedBox(height: 16),
                 _buildStarRating(),
+                const SizedBox(height: 12),
+                _buildAddToCollectionButton(),
                 if (d.tagline != null && d.tagline!.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   _buildTagline(d.tagline!),
@@ -415,6 +418,137 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           }),
         ),
       ],
+    );
+  }
+
+  Widget _buildAddToCollectionButton() {
+    return GestureDetector(
+      onTap: () => _showAddToCollectionSheet(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.playlist_add, color: Colors.white.withValues(alpha: 0.8), size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Koleksiyona Ekle',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.8),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _isSheetOpen = false;
+
+  void _showAddToCollectionSheet() {
+    if (_isSheetOpen) return;
+    _isSheetOpen = true;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1a1a2e),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => _AddToCollectionSheet(
+        movieId: widget.movie.id,
+        onCreateNew: () {
+          Navigator.pop(ctx);
+          _showCreateCollectionAndAdd();
+        },
+      ),
+    ).whenComplete(() => _isSheetOpen = false);
+  }
+
+  void _showCreateCollectionAndAdd() {
+    final nameCtrl = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1a1a2e),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text('Yeni Koleksiyon', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            TextField(
+              controller: nameCtrl,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white),
+              cursorColor: const Color(0xFFEC4899),
+              decoration: InputDecoration(
+                hintText: 'Koleksiyon adı',
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.1),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFEC4899)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () async {
+                  final name = nameCtrl.text.trim();
+                  if (name.isEmpty) return;
+                  final provider = context.read<CollectionsProvider>();
+                  final newCol = await provider.createCollection(name: name);
+                  if (newCol != null) {
+                    await provider.addMovieToCollection(newCol.id, widget.movie.id);
+                  }
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('📁 "${widget.movie.name}" "$name" koleksiyonuna eklendi!'),
+                        backgroundColor: const Color(0xFF4CAF50),
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: const Color(0xFFEC4899),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Oluştur ve Ekle', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -851,6 +985,149 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AddToCollectionSheet extends StatefulWidget {
+  final int movieId;
+  final VoidCallback onCreateNew;
+
+  const _AddToCollectionSheet({required this.movieId, required this.onCreateNew});
+
+  @override
+  State<_AddToCollectionSheet> createState() => _AddToCollectionSheetState();
+}
+
+class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
+  List<CollectionSummary>? _collections;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCollections();
+  }
+
+  Future<void> _loadCollections() async {
+    final provider = context.read<CollectionsProvider>();
+    final data = await provider.getCollectionsForMovie(widget.movieId);
+    if (mounted) {
+      setState(() {
+        _collections = data;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Koleksiyona Ekle',
+            style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: CircularProgressIndicator(color: Color(0xFFEC4899))),
+            )
+          else if (_collections == null || _collections!.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Column(
+                children: [
+                  Icon(Icons.folder_open, size: 48, color: Colors.grey[500]),
+                  const SizedBox(height: 12),
+                  Text('Henüz koleksiyon oluşturmadın', style: TextStyle(color: Colors.grey[500])),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: widget.onCreateNew,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Yeni Koleksiyon Oluştur'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEC4899),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEC4899).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.add, color: Color(0xFFEC4899), size: 20),
+              ),
+              title: const Text('Yeni Koleksiyon', style: TextStyle(color: Color(0xFFEC4899), fontWeight: FontWeight.w600)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              onTap: widget.onCreateNew,
+            ),
+            const Divider(color: Colors.white12),
+            ..._collections!.map((col) {
+              final isInCollection = col.containsMovie ?? false;
+              return ListTile(
+                leading: Icon(
+                  isInCollection ? Icons.check_circle : Icons.circle_outlined,
+                  color: isInCollection ? const Color(0xFF4CAF50) : Colors.white38,
+                ),
+                title: Text(col.name, style: const TextStyle(color: Colors.white)),
+                subtitle: Text(
+                  '${col.movieCount} film',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                tileColor: isInCollection ? const Color(0xFF4CAF50).withValues(alpha: 0.1) : null,
+                onTap: () async {
+                  final isAdding = !isInCollection;
+                  setState(() {
+                    final idx = _collections!.indexWhere((c) => c.id == col.id);
+                    if (idx != -1) {
+                      final current = _collections![idx];
+                      _collections![idx] = CollectionSummary(
+                        id: current.id,
+                        userId: current.userId,
+                        name: current.name,
+                        description: current.description,
+                        isPublic: current.isPublic,
+                        movieCount: isAdding ? current.movieCount + 1 : (current.movieCount - 1).clamp(0, 9999),
+                        coverPosterPath: current.coverPosterPath,
+                        createdAt: current.createdAt,
+                        containsMovie: isAdding,
+                      );
+                    }
+                  });
+
+                  final provider = context.read<CollectionsProvider>();
+                  if (isAdding) {
+                    await provider.addMovieToCollection(col.id, widget.movieId);
+                  } else {
+                    await provider.removeMovieFromCollection(col.id, widget.movieId);
+                  }
+                },
+              );
+            }),
+          ],
+        ],
       ),
     );
   }

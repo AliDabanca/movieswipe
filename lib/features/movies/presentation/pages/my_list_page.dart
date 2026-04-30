@@ -3,16 +3,92 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:movieswipe/core/providers/liked_movies_provider.dart';
+import 'package:movieswipe/core/providers/collections_provider.dart';
 import 'package:movieswipe/features/movies/domain/entities/movie.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_bloc.dart';
 import 'package:movieswipe/features/movies/presentation/pages/movie_detail_page.dart';
+import 'package:movieswipe/features/movies/presentation/pages/collection_detail_page.dart';
 import 'package:movieswipe/features/movies/presentation/widgets/dice_roll_animation.dart';
 import 'dart:math' as math;
 
-/// My List page showing liked movies grouped by genre
-class MyListPage extends StatelessWidget {
+/// My List page with two tabs: Liked Movies & Collections
+class MyListPage extends StatefulWidget {
   const MyListPage({super.key});
 
+  @override
+  State<MyListPage> createState() => _MyListPageState();
+}
+
+class _MyListPageState extends State<MyListPage> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<CollectionsProvider>();
+      if (!provider.isLoaded) provider.loadCollections();
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                indicator: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFEC4899), Color(0xFF8B5CF6)],
+                  ),
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white60,
+                labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                tabs: const [
+                  Tab(text: '❤️ Beğenilenler'),
+                  Tab(text: '📁 Koleksiyonlarım'),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _LikedMoviesTab(),
+              _CollectionsTab(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LikedMoviesTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Consumer<LikedMoviesProvider>(
@@ -20,41 +96,302 @@ class MyListPage extends StatelessWidget {
         if (provider.isLoading && !provider.isLoaded) {
           return const Center(child: CircularProgressIndicator(color: Colors.white));
         }
-
         if (provider.moviesByGenre.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.favorite_border,
-                  size: 100,
-                  color: Colors.grey[400],
-                ),
+                Icon(Icons.favorite_border, size: 100, color: Colors.grey[400]),
                 const SizedBox(height: 16),
-                Text(
-                  'No liked movies yet!',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[600],
-                  ),
-                ),
+                Text('Henüz beğenilen film yok!',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.grey[600])),
                 const SizedBox(height: 8),
-                Text(
-                  'Start swiping to build your collection',
-                  style: TextStyle(color: Colors.grey[500]),
-                ),
+                Text('Kaydırmaya başla ve koleksiyonunu oluştur',
+                    style: TextStyle(color: Colors.grey[500])),
               ],
             ),
           );
         }
-
         return _MyListContent();
       },
     );
   }
 }
+
+class _CollectionsTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<CollectionsProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading && !provider.isLoaded) {
+          return const Center(child: CircularProgressIndicator(color: Colors.white));
+        }
+        return CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: GestureDetector(
+                  onTap: () => _showCreateCollectionDialog(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(colors: [
+                        const Color(0xFFEC4899).withValues(alpha: 0.3),
+                        const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+                      ]),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_rounded, color: Colors.white, size: 28),
+                        SizedBox(width: 8),
+                        Text('Yeni Koleksiyon Oluştur',
+                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (provider.collections.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.folder_open_rounded, size: 80, color: Colors.grey[500]),
+                      const SizedBox(height: 16),
+                      Text('Henüz koleksiyonun yok',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey[500])),
+                      const SizedBox(height: 8),
+                      Text('"Hafta Sonu Maratonu" veya "Klasikler"\ngibi listeler oluştur!',
+                          textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[600])),
+                    ],
+                  ),
+                ),
+              ),
+            if (provider.collections.isNotEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2, childAspectRatio: 0.75, crossAxisSpacing: 12, mainAxisSpacing: 12),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _CollectionCard(collection: provider.collections[index]),
+                    childCount: provider.collections.length,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showCreateCollectionDialog(BuildContext context) {
+    final nameCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    showModalBottomSheet(
+      context: context, isScrollControlled: true, backgroundColor: const Color(0xFF1a1a2e),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Center(child: Container(width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
+          const SizedBox(height: 20),
+          const Text('Yeni Koleksiyon', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          TextField(controller: nameCtrl, autofocus: true, style: const TextStyle(color: Colors.white),
+              cursorColor: const Color(0xFFEC4899),
+              decoration: InputDecoration(hintText: 'Koleksiyon adı (örn: "Hafta Sonu Filmleri")',
+                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)), filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.1),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFEC4899))))),
+          const SizedBox(height: 12),
+          TextField(controller: descCtrl, style: const TextStyle(color: Colors.white),
+              cursorColor: const Color(0xFFEC4899), maxLines: 2,
+              decoration: InputDecoration(hintText: 'Açıklama (isteğe bağlı)',
+                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)), filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.1),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFEC4899))))),
+          const SizedBox(height: 20),
+          SizedBox(width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () async {
+                final name = nameCtrl.text.trim();
+                if (name.isEmpty) return;
+                final desc = descCtrl.text.trim();
+                final provider = context.read<CollectionsProvider>();
+                final result = await provider.createCollection(name: name, description: desc.isNotEmpty ? desc : null);
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  if (result != null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('📁 "$name" koleksiyonu oluşturuldu!'), backgroundColor: const Color(0xFF4CAF50)));
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: const Color(0xFFEC4899), foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              child: const Text('Oluştur', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _CollectionCard extends StatelessWidget {
+  final CollectionSummary collection;
+  const _CollectionCard({required this.collection});
+
+  @override
+  Widget build(BuildContext context) {
+    final posterUrl = collection.coverPosterPath != null
+        ? 'https://image.tmdb.org/t/p/w500${collection.coverPosterPath}' : null;
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => BlocProvider.value(value: context.read<MoviesBloc>(),
+              child: CollectionDetailPage(collectionId: collection.id, collectionName: collection.name)))),
+      onLongPress: () => _showCollectionOptions(context),
+      child: Container(
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6))]),
+        child: ClipRRect(borderRadius: BorderRadius.circular(16),
+          child: Stack(fit: StackFit.expand, children: [
+            if (posterUrl != null)
+              CachedNetworkImage(imageUrl: posterUrl, fit: BoxFit.cover,
+                  placeholder: (_, __) => _gradientPlaceholder(), errorWidget: (_, __, ___) => _gradientPlaceholder())
+            else _gradientPlaceholder(),
+            Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                colors: [Colors.transparent, Colors.black.withValues(alpha: 0.8)], stops: const [0.4, 1.0]))),
+            Positioned(bottom: 12, left: 12, right: 12,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(collection.name, maxLines: 2, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold,
+                        shadows: [Shadow(color: Colors.black45, offset: Offset(0, 1), blurRadius: 3)])),
+                const SizedBox(height: 4),
+                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
+                    child: Text('${collection.movieCount} film',
+                        style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500))),
+              ])),
+            if (collection.isPublic)
+              Positioned(top: 8, right: 8,
+                child: Container(padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.public, color: Colors.white60, size: 16))),
+          ])),
+      ),
+    );
+  }
+
+  Widget _gradientPlaceholder() => Container(
+      decoration: const BoxDecoration(gradient: LinearGradient(
+          colors: [Color(0xFF6366F1), Color(0xFFEC4899)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
+      child: const Center(child: Icon(Icons.folder_rounded, size: 48, color: Colors.white54)));
+
+  void _showCollectionOptions(BuildContext context) {
+    showModalBottomSheet(context: context, backgroundColor: const Color(0xFF1a1a2e),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 16),
+          Text(collection.name, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          ListTile(leading: const Icon(Icons.edit, color: Colors.white70),
+              title: const Text('Düzenle', style: TextStyle(color: Colors.white)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              onTap: () { Navigator.pop(ctx); _showEditDialog(context); }),
+          ListTile(leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              title: const Text('Sil', style: TextStyle(color: Colors.redAccent)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final confirmed = await showDialog<bool>(context: context,
+                    builder: (dCtx) => AlertDialog(backgroundColor: const Color(0xFF1a1a2e),
+                        title: const Text('Koleksiyonu Sil', style: TextStyle(color: Colors.white)),
+                        content: Text('"${collection.name}" koleksiyonunu silmek istediğine emin misin?',
+                            style: const TextStyle(color: Colors.white70)),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('İptal')),
+                          TextButton(onPressed: () => Navigator.pop(dCtx, true),
+                              style: TextButton.styleFrom(foregroundColor: Colors.redAccent), child: const Text('Sil')),
+                        ]));
+                if (confirmed == true && context.mounted) {
+                  context.read<CollectionsProvider>().deleteCollection(collection.id);
+                }
+              }),
+        ])));
+  }
+
+  void _showEditDialog(BuildContext context) {
+    final nameCtrl = TextEditingController(text: collection.name);
+    final descCtrl = TextEditingController(text: collection.description ?? '');
+    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: const Color(0xFF1a1a2e),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Center(child: Container(width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
+          const SizedBox(height: 20),
+          const Text('Koleksiyonu Düzenle', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          TextField(controller: nameCtrl, autofocus: true, style: const TextStyle(color: Colors.white),
+              cursorColor: const Color(0xFFEC4899),
+              decoration: InputDecoration(hintText: 'Koleksiyon adı',
+                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)), filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.1),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFEC4899))))),
+          const SizedBox(height: 12),
+          TextField(controller: descCtrl, style: const TextStyle(color: Colors.white),
+              cursorColor: const Color(0xFFEC4899), maxLines: 2,
+              decoration: InputDecoration(hintText: 'Açıklama (isteğe bağlı)',
+                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)), filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.1),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFEC4899))))),
+          const SizedBox(height: 20),
+          SizedBox(width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () async {
+                final name = nameCtrl.text.trim();
+                if (name.isEmpty) return;
+                final desc = descCtrl.text.trim();
+                await context.read<CollectionsProvider>().updateCollection(collection.id,
+                    name: name, description: desc.isNotEmpty ? desc : null);
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: const Color(0xFFEC4899), foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              child: const Text('Kaydet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+
 
 /// Stateful content widget for genre filtering
 class _MyListContent extends StatefulWidget {

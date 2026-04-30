@@ -5,6 +5,7 @@ import 'package:movieswipe/core/config/env_config.dart';
 import 'package:movieswipe/core/di/injection_container.dart' as di;
 import 'package:movieswipe/core/providers/auth_provider.dart';
 import 'package:movieswipe/core/providers/liked_movies_provider.dart';
+import 'package:movieswipe/core/providers/collections_provider.dart';
 import 'package:movieswipe/features/auth/presentation/pages/login_page.dart';
 import 'package:movieswipe/features/auth/presentation/pages/username_page.dart';
 import 'package:movieswipe/features/onboarding/presentation/pages/onboarding_page.dart';
@@ -40,6 +41,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => LikedMoviesProvider()),
+        ChangeNotifierProvider(create: (_) => CollectionsProvider()),
       ],
       child: MaterialApp(
         title: 'MovieSwipe',
