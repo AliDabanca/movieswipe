@@ -140,7 +140,8 @@ async def get_movie_details(
         try:
             from fastapi.concurrency import run_in_threadpool
             similar_ds = SupabaseDataSource()
-            similar_raw = await run_in_threadpool(similar_ds.get_similar_movies, movie_id, 3)
+            # Artık yatay kaydırılabilir listemiz olduğu için 3 yerine 10 film getiriyoruz
+            similar_raw = await run_in_threadpool(similar_ds.get_similar_movies, movie_id, 10)
             return [
                 MovieModel(
                     id=m["id"],

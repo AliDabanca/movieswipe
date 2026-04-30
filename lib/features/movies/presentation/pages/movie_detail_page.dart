@@ -752,25 +752,18 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           ),
         ),
         const SizedBox(height: 16),
-        movies.length > 4
-            ? SizedBox(
-                height: 200,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: movies.length,
-                  separatorBuilder: (context, index) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    final movie = movies[index];
-                    return _buildSimilarMovieCard(movie);
-                  },
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children:
-                    movies.map((m) => _buildSimilarMovieCard(m)).toList(),
-              ),
+        SizedBox(
+          height: 220, // Increased height to ensure no clipping for text/poster
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: movies.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final movie = movies[index];
+              return _buildSimilarMovieCard(movie);
+            },
+          ),
+        ),
       ],
     );
   }

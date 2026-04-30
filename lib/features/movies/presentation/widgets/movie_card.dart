@@ -44,33 +44,38 @@ class MovieCard extends StatelessWidget {
           children: [
             // Poster Image
             Expanded(
-              flex: 3,
-              child: ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
-                child: movie.posterPath != null
-                    ? CachedNetworkImage(
-                        imageUrl: '$tmdbImageBaseUrl${movie.posterPath}',
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: Colors.grey[300],
+              flex: 4, // Give more priority to the poster area
+              child: Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF1a1a2e),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: movie.posterPath != null
+                      ? CachedNetworkImage(
+                          imageUrl: '$tmdbImageBaseUrl${movie.posterPath}',
+                          fit: BoxFit.contain,
+                          alignment: Alignment.center,
+                          placeholder: (context, url) => Container(
+                            color: const Color(0xFF1a1a2e),
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            color: const Color(0xFF1a1a2e),
+                            child: const Icon(Icons.movie, size: 100, color: Colors.grey),
+                          ),
+                        )
+                      : Container(
+                          color: const Color(0xFF1a1a2e),
                           child: const Center(
-                            child: CircularProgressIndicator(),
+                            child: Icon(Icons.movie, size: 100, color: Colors.grey),
                           ),
                         ),
-                        errorWidget: (context, url, error) => Container(
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.movie,
-                              size: 100, color: Colors.grey),
-                        ),
-                      )
-                    : Container(
-                        color: Colors.grey[300],
-                        child: const Center(
-                          child:
-                              Icon(Icons.movie, size: 100, color: Colors.grey),
-                        ),
-                      ),
+                ),
               ),
             ),
 

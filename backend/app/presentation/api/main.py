@@ -47,6 +47,11 @@ async def lifespan(app: FastAPI):
     import asyncio
     asyncio.create_task(scheduler_service.run_startup_sync())
     
+    # Warm up the ML model in the background so the first request is instant
+    from app.services.embedding_service import embedding_service
+    asyncio.create_task(asyncio.to_thread(embedding_service._load_model))
+
+    
     logger.info("✅ Startup complete!")
     
     yield  # App is running

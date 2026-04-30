@@ -887,12 +887,12 @@ class RecommendationService:
         # 3. Query pgvector for semantically similar movies
         swiped_ids = set(self.supabase_ds.get_user_swiped_movie_ids(user_id))
 
-        # Use the existing match_movies RPC (no user filter — we filter manually)
+        # Use the existing match_movies RPC
         try:
-            # Fetch a larger pool (limit * 6) to allow for variety and filtering
+            # Fetch a smaller pool (limit * 2) to ensure high relevance but keep slight variety
             response = self.supabase_ds.client.rpc("match_movies_for_user", {
                 "query_embedding": mood_vector,
-                "match_count": limit * 6,  
+                "match_count": limit * 2,  
                 "user_id_param": user_id,
             }).execute()
             candidates = response.data if response.data else []
@@ -919,7 +919,7 @@ class RecommendationService:
             ).to_entity()
             pre_filtered.append(movie)
 
-        # 5. Shuffle the candidate pool to add variety for the same answers
+        # 5. Shuffle the HIGHLY RELEVANT candidate pool to add variety
         random.shuffle(pre_filtered)
         results = pre_filtered[:limit]
 

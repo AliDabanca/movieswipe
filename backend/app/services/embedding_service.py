@@ -41,9 +41,10 @@ class EmbeddingService:
     _lock = threading.Lock()
     _loader_lock = threading.Lock()
 
-    MODEL_NAME = "all-MiniLM-L6-v2"
+    MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
     EMBEDDING_DIM = 384
     CACHE_DIR = _CACHE_DIR
+
 
     def __new__(cls):
         if cls._instance is None:
