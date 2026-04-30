@@ -1,6 +1,13 @@
 """Movie Pydantic model for data layer."""
 
 from pydantic import BaseModel, Field
+from typing import Optional
+
+
+class RecommendationReasonModel(BaseModel):
+    """Why a movie was recommended — contextual metadata, not intrinsic."""
+    code: str = Field(..., description="Machine-readable reason code")
+    text: str = Field(..., description="User-facing explanation")
 
 
 class MovieModel(BaseModel):
@@ -14,6 +21,7 @@ class MovieModel(BaseModel):
     release_date: str | None = Field(None, description="Release date")
     vote_average: float | None = Field(None, description="TMDB vote average")
     user_rating: int | None = Field(None, ge=1, le=5, description="Personal rating (1-5 stars)")
+    recommendation_reason: Optional[RecommendationReasonModel] = Field(None, description="Why this movie was recommended")
 
     class Config:
         from_attributes = True
@@ -39,11 +47,15 @@ class MovieModel(BaseModel):
             release_date=self.release_date,
             vote_average=self.vote_average,
             user_rating=self.user_rating,
+            recommendation_reason=self.recommendation_reason.model_dump() if self.recommendation_reason else None,
         )
 
     @classmethod
     def from_entity(cls, entity):
         """Create from domain entity."""
+        reason = None
+        if entity.recommendation_reason:
+            reason = RecommendationReasonModel(**entity.recommendation_reason)
         return cls(
             id=entity.id,
             name=entity.name,
@@ -53,6 +65,7 @@ class MovieModel(BaseModel):
             release_date=entity.release_date,
             vote_average=entity.vote_average,
             user_rating=entity.user_rating,
+            recommendation_reason=reason,
         )
 
 

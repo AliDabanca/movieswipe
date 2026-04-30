@@ -11,6 +11,7 @@ class MovieModel extends Movie {
     super.overview,
     super.voteAverage,
     super.userRating,
+    super.recommendationReason,
   });
 
   /// Create from JSON
@@ -24,6 +25,7 @@ class MovieModel extends Movie {
       overview: json['overview'] as String?,
       voteAverage: (json['vote_average'] as num?)?.toDouble(),
       userRating: json['user_rating'] as int?,
+      recommendationReason: json['recommendation_reason'] as Map<String, dynamic>?,
     );
   }
 
@@ -38,6 +40,7 @@ class MovieModel extends Movie {
       'overview': overview,
       'vote_average': voteAverage,
       'user_rating': userRating,
+      'recommendation_reason': recommendationReason,
     };
   }
 
@@ -52,6 +55,7 @@ class MovieModel extends Movie {
       overview: overview,
       voteAverage: voteAverage,
       userRating: userRating,
+      recommendationReason: recommendationReason,
     );
   }
 }

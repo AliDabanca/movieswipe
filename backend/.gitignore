@@ -60,4 +60,4 @@ logs/
 Thumbs.db
 
 # ML model cache (~90MB, auto-downloaded)
-models/
+/models/

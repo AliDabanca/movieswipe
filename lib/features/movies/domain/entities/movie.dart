@@ -10,6 +10,9 @@ class Movie extends Equatable {
   final String? overview;
   final double? voteAverage;
   final int? userRating;
+  /// Contextual recommendation metadata — not intrinsic movie data.
+  /// Contains {"code": "genre_match", "text": "Senin Türün: Sci-Fi"}
+  final Map<String, dynamic>? recommendationReason;
 
   const Movie({
     required this.id,
@@ -20,6 +23,7 @@ class Movie extends Equatable {
     this.overview,
     this.voteAverage,
     this.userRating,
+    this.recommendationReason,
   });
 
   Movie copyWith({
@@ -31,6 +35,7 @@ class Movie extends Equatable {
     String? overview,
     double? voteAverage,
     int? userRating,
+    Map<String, dynamic>? recommendationReason,
   }) {
     return Movie(
       id: id ?? this.id,
@@ -41,11 +46,12 @@ class Movie extends Equatable {
       overview: overview ?? this.overview,
       voteAverage: voteAverage ?? this.voteAverage,
       userRating: userRating ?? this.userRating,
+      recommendationReason: recommendationReason ?? this.recommendationReason,
     );
   }
 
   @override
-  List<Object?> get props => [id, name, genre, posterPath, releaseDate, overview, voteAverage, userRating];
+  List<Object?> get props => [id, name, genre, posterPath, releaseDate, overview, voteAverage, userRating, recommendationReason];
 }
 
 /// Extended movie entity for detail page

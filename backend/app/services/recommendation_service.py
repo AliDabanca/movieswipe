@@ -218,13 +218,23 @@ class DiversityMixer:
         profile: UserProfile,
         limit: int = 50,
     ) -> List[Movie]:
-        """Build final recommendation list with diversity guarantees."""
+        """Build final recommendation list with diversity guarantees.
+        
+        Also injects recommendation_reason metadata for explainability.
+        """
         
         personalized_count = int(limit * self.PERSONALIZED_RATIO)
         exploration_count = limit - personalized_count
         
         # --- Personalized picks (top scored) ---
         personalized = [m for m, _ in scored_movies[:personalized_count]]
+        # Tag personalized picks with genre-match reason
+        genre_phrases = ["Tam Senlik", "Favorin", "Bunu Seversin", "Senin Tarz\u0131n"]
+        for m in personalized:
+            m.recommendation_reason = {
+                "code": "genre_match",
+                "text": f"{random.choice(genre_phrases)} ({m.genre})",
+            }
         
         # --- Exploration picks ---
         exploration = self._pick_exploration(
@@ -259,6 +269,12 @@ class DiversityMixer:
             if m.genre in unseen_genres and m.id not in used_ids
         ]
         random.shuffle(unseen_genre_movies)
+        explore_phrases = ["Farkl\u0131 Bir Tat", "Buna \u015eans Ver", "Ke\u015ffet", "Rutini K\u0131r"]
+        for m in unseen_genre_movies[:unseen_genre_count]:
+            m.recommendation_reason = {
+                "code": "exploration",
+                "text": f"{random.choice(explore_phrases)} ({m.genre})",
+            }
         exploration.extend(unseen_genre_movies[:unseen_genre_count])
         used_ids.update(m.id for m in exploration)
         
@@ -270,6 +286,12 @@ class DiversityMixer:
             if (m.vote_average or 0) >= quality_threshold and m.id not in used_ids
         ]
         random.shuffle(quality_movies)
+        critics_phrases = ["Herkesin Favorisi", "Ba\u015fyap\u0131t Alarm\u0131", "Kesinlikle \u0130zlemelisin", "S\u00fcrpriz Hit"]
+        for m in quality_movies[:quality_count]:
+            m.recommendation_reason = {
+                "code": "critics_choice",
+                "text": random.choice(critics_phrases),
+            }
         exploration.extend(quality_movies[:quality_count])
         
         # If still short, fill from remaining unseen
@@ -497,6 +519,15 @@ class RecommendationService:
             f"for user {user_id} (from {len(semantic_data)} candidates)"
         )
 
+        # Tag semantic recommendations
+        ai_phrases = ["Ruh Haline Uygun", "Sihirli Eşleşme", "Tam İstediğin Gibi", "Nokta Atışı"]
+        for m in recommendations:
+            if not m.recommendation_reason:
+                m.recommendation_reason = {
+                    "code": "vector_match",
+                    "text": random.choice(ai_phrases),
+                }
+
         return recommendations
     
     def _cold_start_recommendations(
@@ -529,6 +560,14 @@ class RecommendationService:
         
         # Shuffle for variety (don't always show highest rated first)
         random.shuffle(result)
+        
+        # Tag cold start movies
+        cold_phrases = ["G\u00fcn\u00fcn Pop\u00fcleri", "Trendlerde", "\u00c7ok Konu\u015fulanlar"]
+        for m in result:
+            m.recommendation_reason = {
+                "code": "cold_start",
+                "text": random.choice(cold_phrases),
+            }
         
         return result
 
