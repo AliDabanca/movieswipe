@@ -6,11 +6,13 @@ import 'package:movieswipe/core/providers/liked_movies_provider.dart';
 import 'package:movieswipe/features/movies/presentation/pages/swipe_page.dart';
 import 'package:movieswipe/features/movies/presentation/pages/my_list_page.dart';
 import 'package:movieswipe/features/users/presentation/pages/profile_page.dart';
+import 'package:movieswipe/features/social/presentation/pages/social_dashboard_page.dart';
 import 'package:movieswipe/core/di/injection_container.dart';
 import 'package:movieswipe/core/presentation/widgets/global_app_background.dart';
 
 import 'package:movieswipe/features/movies/presentation/bloc/movies_bloc.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_event.dart';
+import 'package:movieswipe/features/social/presentation/bloc/social_bloc.dart';
 
 /// Main navigation scaffold with bottom navigation bar
 class MainNavigation extends StatefulWidget {
@@ -26,6 +28,7 @@ class _MainNavigationState extends State<MainNavigation> {
   final List<Widget> _pages = const [
     SwipePage(),
     MyListPage(),
+    SocialDashboardPage(),
     ProfilePage(),
   ];
 
@@ -46,8 +49,11 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => sl<MoviesBloc>()..add(LoadMoviesEvent()),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => sl<MoviesBloc>()..add(LoadMoviesEvent())),
+        BlocProvider(create: (_) => sl<SocialBloc>()),
+      ],
       child: GlobalAppBackground(
         child: Scaffold(
           backgroundColor: Colors.transparent,
@@ -76,6 +82,11 @@ class _MainNavigationState extends State<MainNavigation> {
                 label: 'My List',
               ),
               NavigationDestination(
+                icon: Icon(Icons.group_outlined),
+                selectedIcon: Icon(Icons.group),
+                label: 'Social',
+              ),
+              NavigationDestination(
                 icon: Icon(Icons.person_outline),
                 selectedIcon: Icon(Icons.person),
                 label: 'Profile',
@@ -87,3 +98,4 @@ class _MainNavigationState extends State<MainNavigation> {
     );
   }
 }
+

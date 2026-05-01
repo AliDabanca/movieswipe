@@ -50,13 +50,15 @@ class _UserSelectionPageState extends State<UserSelectionPage> {
       final response = await ApiClient(client: null).post('/users');
       final userId = response['user_id'];
 
-      if (mounted) {
-        await Provider.of<UserProvider>(context, listen: false)
-            .setUserId(userId);
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const SwipePage()),
-        );
-      }
+      if (!mounted) return;
+
+      final navigator = Navigator.of(context);
+      await Provider.of<UserProvider>(context, listen: false)
+          .setUserId(userId);
+      
+      navigator.pushReplacement(
+        MaterialPageRoute(builder: (_) => const SwipePage()),
+      );
     } catch (e) {
       setState(() => _loading = false);
       if (mounted) {

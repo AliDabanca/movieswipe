@@ -642,30 +642,38 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildAchievementTile(Map<String, dynamic> badge, bool isUnlocked) {
     return Opacity(
-      opacity: isUnlocked ? 1.0 : 0.35,
+      opacity: isUnlocked ? 1.0 : 0.5,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 56,
-            height: 56,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
+              gradient: isUnlocked ? LinearGradient(
+                colors: [
+                  const Color(0xFFE94560).withValues(alpha: 0.2),
+                  const Color(0xFFE94560).withValues(alpha: 0.05),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ) : null,
               color: isUnlocked
-                  ? const Color(0xFFE94560).withValues(alpha: 0.12)
+                  ? null
                   : Colors.white.withValues(alpha: 0.04),
               border: Border.all(
                 color: isUnlocked
-                    ? const Color(0xFFE94560).withValues(alpha: 0.4)
-                    : Colors.white.withValues(alpha: 0.08),
-                width: 1.5,
+                    ? const Color(0xFFE94560).withValues(alpha: 0.6)
+                    : Colors.white.withValues(alpha: 0.1),
+                width: 2,
               ),
               boxShadow: isUnlocked
                   ? [
                       BoxShadow(
-                        color: const Color(0xFFE94560).withValues(alpha: 0.2),
-                        blurRadius: 12,
-                        spreadRadius: 1,
+                        color: const Color(0xFFE94560).withValues(alpha: 0.3),
+                        blurRadius: 15,
+                        spreadRadius: 2,
                       ),
                     ]
                   : null,
@@ -674,7 +682,7 @@ class _ProfilePageState extends State<ProfilePage> {
               child: isUnlocked
                   ? Text(
                       badge['icon'],
-                      style: const TextStyle(fontSize: 26),
+                      style: const TextStyle(fontSize: 28),
                     )
                   : ColorFiltered(
                       colorFilter: const ColorFilter.matrix(<double>[
@@ -685,22 +693,22 @@ class _ProfilePageState extends State<ProfilePage> {
                       ]),
                       child: Text(
                         badge['icon'],
-                        style: const TextStyle(fontSize: 26),
+                        style: const TextStyle(fontSize: 28),
                       ),
                     ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             badge['title'],
             textAlign: TextAlign.center,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 10,
-              fontWeight: isUnlocked ? FontWeight.w600 : FontWeight.w400,
+              fontSize: 11,
+              fontWeight: isUnlocked ? FontWeight.bold : FontWeight.w500,
               color: isUnlocked
-                  ? Colors.white.withValues(alpha: 0.9)
+                  ? Colors.white
                   : Colors.white.withValues(alpha: 0.4),
             ),
           ),
@@ -776,22 +784,40 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 16),
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: isUnlocked
-                      ? const Color(0xFF27AE60).withValues(alpha: 0.15)
-                      : Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  isUnlocked ? '✅ Kazanıldı' : '🔒 Kilitli',
-                  style: TextStyle(
+                      ? const Color(0xFF27AE60).withValues(alpha: 0.2)
+                      : Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
                     color: isUnlocked
-                        ? const Color(0xFF27AE60)
-                        : Colors.white.withValues(alpha: 0.5),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                        ? const Color(0xFF27AE60).withValues(alpha: 0.5)
+                        : Colors.white.withValues(alpha: 0.1),
                   ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isUnlocked ? Icons.check_circle_rounded : Icons.lock_rounded,
+                      size: 14,
+                      color: isUnlocked
+                          ? const Color(0xFF27AE60)
+                          : Colors.white.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isUnlocked ? 'Kazanıldı' : 'Kilit Açma Şartı',
+                      style: TextStyle(
+                        color: isUnlocked
+                            ? const Color(0xFF27AE60)
+                            : Colors.white.withValues(alpha: 0.7),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

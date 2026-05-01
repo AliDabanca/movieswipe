@@ -20,3 +20,18 @@ class MessageResponse(BaseModel):
 
     class Config:
         json_schema_extra = {"example": {"message": "Success"}}
+
+
+VALID_WATCH_STATUSES = {"watched", "watch_later", "favorite", "dropped"}
+
+
+class WatchStatusRequest(BaseModel):
+    """Watch status update request."""
+
+    watch_status: str | None = Field(
+        None,
+        description="Watch status: watched, watch_later, favorite, dropped, or null to clear",
+    )
+
+    class Config:
+        json_schema_extra = {"example": {"watch_status": "watched"}}

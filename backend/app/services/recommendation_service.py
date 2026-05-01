@@ -218,13 +218,23 @@ class DiversityMixer:
         profile: UserProfile,
         limit: int = 50,
     ) -> List[Movie]:
-        """Build final recommendation list with diversity guarantees."""
+        """Build final recommendation list with diversity guarantees.
+        
+        Also injects recommendation_reason metadata for explainability.
+        """
         
         personalized_count = int(limit * self.PERSONALIZED_RATIO)
         exploration_count = limit - personalized_count
         
         # --- Personalized picks (top scored) ---
         personalized = [m for m, _ in scored_movies[:personalized_count]]
+        # Tag personalized picks with genre-match reason
+        genre_phrases = ["Tam Senlik", "Favorin", "Bunu Seversin", "Senin Tarz\u0131n"]
+        for m in personalized:
+            m.recommendation_reason = {
+                "code": "genre_match",
+                "text": f"{random.choice(genre_phrases)} ({m.genre})",
+            }
         
         # --- Exploration picks ---
         exploration = self._pick_exploration(
@@ -259,6 +269,12 @@ class DiversityMixer:
             if m.genre in unseen_genres and m.id not in used_ids
         ]
         random.shuffle(unseen_genre_movies)
+        explore_phrases = ["Farkl\u0131 Bir Tat", "Buna \u015eans Ver", "Ke\u015ffet", "Rutini K\u0131r"]
+        for m in unseen_genre_movies[:unseen_genre_count]:
+            m.recommendation_reason = {
+                "code": "exploration",
+                "text": f"{random.choice(explore_phrases)} ({m.genre})",
+            }
         exploration.extend(unseen_genre_movies[:unseen_genre_count])
         used_ids.update(m.id for m in exploration)
         
@@ -270,6 +286,12 @@ class DiversityMixer:
             if (m.vote_average or 0) >= quality_threshold and m.id not in used_ids
         ]
         random.shuffle(quality_movies)
+        critics_phrases = ["Herkesin Favorisi", "Ba\u015fyap\u0131t Alarm\u0131", "Kesinlikle \u0130zlemelisin", "S\u00fcrpriz Hit"]
+        for m in quality_movies[:quality_count]:
+            m.recommendation_reason = {
+                "code": "critics_choice",
+                "text": random.choice(critics_phrases),
+            }
         exploration.extend(quality_movies[:quality_count])
         
         # If still short, fill from remaining unseen
@@ -497,6 +519,15 @@ class RecommendationService:
             f"for user {user_id} (from {len(semantic_data)} candidates)"
         )
 
+        # Tag semantic recommendations
+        ai_phrases = ["Ruh Haline Uygun", "Sihirli Eşleşme", "Tam İstediğin Gibi", "Nokta Atışı"]
+        for m in recommendations:
+            if not m.recommendation_reason:
+                m.recommendation_reason = {
+                    "code": "vector_match",
+                    "text": random.choice(ai_phrases),
+                }
+
         return recommendations
     
     def _cold_start_recommendations(
@@ -529,6 +560,14 @@ class RecommendationService:
         
         # Shuffle for variety (don't always show highest rated first)
         random.shuffle(result)
+        
+        # Tag cold start movies
+        cold_phrases = ["G\u00fcn\u00fcn Pop\u00fcleri", "Trendlerde", "\u00c7ok Konu\u015fulanlar"]
+        for m in result:
+            m.recommendation_reason = {
+                "code": "cold_start",
+                "text": random.choice(cold_phrases),
+            }
         
         return result
 
@@ -615,7 +654,7 @@ class RecommendationService:
     def get_liked_movies_by_genre(self, user_id: str) -> Dict[str, Any]:
         """Get user's liked movies grouped by genre and the recent 10 additions."""
         liked_swipes = self.supabase_ds.client.table("user_swipes")\
-            .select("movie_id, swiped_at, rating")\
+            .select("movie_id, swiped_at, rating, watch_status")\
             .eq("user_id", user_id)\
             .eq("is_like", True)\
             .order("swiped_at", desc=True)\
@@ -636,8 +675,14 @@ class RecommendationService:
         swipe_map = {s["movie_id"]: s for s in liked_swipes.data}
         movie_map = {m["id"]: m for m in movies_data}
         
+        # Deduplicate: track seen movie IDs to prevent duplicates
+        seen_ids = set()
         formatted_movies = []
         for m_id in liked_movie_ids:
+            if m_id in seen_ids:
+                continue
+            seen_ids.add(m_id)
+            
             if m_id not in movie_map:
                 continue
                 
@@ -651,7 +696,8 @@ class RecommendationService:
                 "poster_path": movie.get("poster_path"),
                 "vote_average": movie.get("vote_average", 0.0),
                 "release_date": movie.get("release_date"),
-                "user_rating": swipe.get("rating")
+                "user_rating": swipe.get("rating"),
+                "watch_status": swipe.get("watch_status"),
             })
             
         recently_added = formatted_movies[:10]
@@ -820,3 +866,105 @@ class RecommendationService:
                 return f"{monday.day} {m_month} - {sunday.day} {s_month}"
         except Exception:
             return week_key
+
+    # ── Smart AI Discovery ────────────────────────────────────
+
+    # Each answer option maps to descriptive English keywords that the
+    # embedding model can understand semantically.
+    MOOD_TAGS = {
+        # Q1: Mood
+        "happy":      "cheerful upbeat lighthearted comedy funny feel-good",
+        "dark":       "dark tense suspenseful thriller horror creepy disturbing",
+        "emotional":  "emotional touching heartfelt romantic drama tearjerker love",
+        "adrenaline": "action explosive fast adventure battle superhero intense",
+        "thoughtful": "philosophical thought-provoking cerebral sci-fi existential mind-bending",
+        "chill":      "easy relaxing casual popcorn entertaining light fun",
+        # Q2: Pace
+        "fast":       "high-energy rapid action-packed exciting thrilling non-stop",
+        "calm":       "atmospheric slow-burn meditative contemplative serene quiet",
+        "twisty":     "plot-twist unpredictable mystery suspense puzzle mindbender",
+        "visual":     "visually stunning cinematic beautiful artistic breathtaking epic",
+        "grounded":   "realistic grounded true-to-life authentic gritty urban",
+        # Q3: World
+        "classic":    "classic timeless golden-age vintage old-school legendary masterpiece",
+        "modern":     "recent contemporary modern fresh new current",
+        "fantasy":    "fantasy sci-fi alien space otherworldly futuristic magical",
+        "true_story": "based-on-true-story biography real-events historical documentary inspired",
+        "cult":       "cult indie underground quirky unconventional experimental arthouse",
+    }
+
+    def get_mood_recommendations(
+        self, user_id: str, answers: list[str], limit: int = 5
+    ) -> list[Movie]:
+        """Generate movie recommendations from mood survey answers.
+
+        Algorithm:
+            1. Map each answer tag to its descriptive keywords
+            2. Concatenate into a single "mood sentence"
+            3. Generate an embedding vector from that sentence
+            4. Query pgvector for the closest movies (cosine similarity)
+            5. Filter out already-swiped movies
+            6. Return the top `limit` results
+        """
+
+        # 1. Build mood sentence from answer tags
+        keywords = []
+        for answer in answers:
+            tag_text = self.MOOD_TAGS.get(answer, answer)
+            keywords.append(tag_text)
+
+        mood_sentence = " ".join(keywords)
+        logger.info(f"Smart Discovery for user {user_id}: '{mood_sentence}'")
+
+        # 2. Generate embedding vector for this mood
+        from app.services.embedding_service import embedding_service
+        mood_vector = embedding_service.generate_embedding(mood_sentence)
+
+        if not mood_vector:
+            logger.error("Failed to generate mood vector")
+            return []
+
+        # 3. Query pgvector for semantically similar movies
+        swiped_ids = set(self.supabase_ds.get_user_swiped_movie_ids(user_id))
+
+        # Use the existing match_movies RPC
+        try:
+            # Fetch a smaller pool (limit * 2) to ensure high relevance but keep slight variety
+            response = self.supabase_ds.client.rpc("match_movies_for_user", {
+                "query_embedding": mood_vector,
+                "match_count": limit * 2,  
+                "user_id_param": user_id,
+            }).execute()
+            candidates = response.data if response.data else []
+        except Exception as e:
+            logger.error(f"Smart Discovery vector search failed: {e}")
+            return []
+
+        # 4. Filter swiped + convert to Movie entities
+        pre_filtered = []
+        for m in candidates:
+            if m["id"] in swiped_ids:
+                continue
+            if not m.get("poster_path"):
+                continue
+
+            movie = MovieModel(
+                id=m["id"],
+                name=m.get("name", "Unknown"),
+                genre=m.get("genre", "General"),
+                poster_path=m.get("poster_path"),
+                overview=m.get("overview"),
+                release_date=m.get("release_date"),
+                vote_average=m.get("vote_average", 0),
+            ).to_entity()
+            pre_filtered.append(movie)
+
+        # 5. Shuffle the HIGHLY RELEVANT candidate pool to add variety
+        random.shuffle(pre_filtered)
+        results = pre_filtered[:limit]
+
+        logger.info(
+            f"Smart Discovery returned {len(results)} shuffled movies "
+            f"for user {user_id} (from {len(candidates)} candidates)"
+        )
+        return results

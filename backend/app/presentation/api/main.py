@@ -9,14 +9,27 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.errors import DomainException, NotFoundError, ValidationError
-from app.presentation.api.routes import movies, recommendations, users, sync, search
+from app.presentation.api.routes import movies, recommendations, users, sync, search, social
 
-# Configure logging
+# Configure logging - single handler to avoid duplicate output
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
 )
+# Prevent duplicate log lines from child loggers
+logging.getLogger("movieswipe").propagate = False
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s"))
+movieswipe_logger = logging.getLogger("movieswipe")
+if not movieswipe_logger.handlers:
+    movieswipe_logger.addHandler(handler)
+    movieswipe_logger.setLevel(logging.INFO)
+
 logger = logging.getLogger("movieswipe")
+
+# Suppress noisy third-party loggers
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 @asynccontextmanager
@@ -33,6 +46,11 @@ async def lifespan(app: FastAPI):
     # Run immediate startup sync in background (non-blocking)
     import asyncio
     asyncio.create_task(scheduler_service.run_startup_sync())
+    
+    # Warm up the ML model in the background so the first request is instant
+    from app.services.embedding_service import embedding_service
+    asyncio.create_task(asyncio.to_thread(embedding_service._load_model))
+
     
     logger.info("✅ Startup complete!")
     
@@ -82,10 +100,19 @@ async def domain_exception_handler(request: Request, exc: DomainException):
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     """Handle unexpected exceptions."""
+    from app.core.errors import ServerError
+    
+    if isinstance(exc, ServerError):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.message},
+        )
+        
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "Internal server error"},
     )
+
 
 
 # Root endpoint
@@ -112,3 +139,4 @@ app.include_router(recommendations.router)
 app.include_router(users.router)
 app.include_router(sync.router)
 app.include_router(search.router)
+app.include_router(social.router)

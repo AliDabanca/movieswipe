@@ -7,7 +7,7 @@ import asyncio
 from app.domain.repositories.movie_repository import MovieRepository
 from app.data.models.movie_model import MovieModel, MovieDetailModel, WatchProviderModel, WatchProvidersResponse
 from app.presentation.api.dependencies import get_movie_repository
-from app.presentation.schemas.requests import SwipeRequest, MessageResponse
+from app.presentation.schemas.requests import SwipeRequest, MessageResponse, WatchStatusRequest, VALID_WATCH_STATUSES
 from app.core.errors import NotFoundError
 from app.core.auth import get_current_user_id
 from app.data.services.tmdb_service import TMDBService
@@ -140,7 +140,8 @@ async def get_movie_details(
         try:
             from fastapi.concurrency import run_in_threadpool
             similar_ds = SupabaseDataSource()
-            similar_raw = await run_in_threadpool(similar_ds.get_similar_movies, movie_id, 3)
+            # Artık yatay kaydırılabilir listemiz olduğu için 3 yerine 10 film getiriyoruz
+            similar_raw = await run_in_threadpool(similar_ds.get_similar_movies, movie_id, 10)
             return [
                 MovieModel(
                     id=m["id"],
@@ -157,12 +158,20 @@ async def get_movie_details(
             logger.warning(f"Similar movies unavailable for movie {movie_id}: {e}")
             return []
 
+    async def _fetch_watch_providers() -> dict:
+        try:
+            return await tmdb.get_watch_providers(movie_id)
+        except Exception as e:
+            logger.warning(f"Watch providers unavailable for movie {movie_id}: {e}")
+            return {"providers": [], "tmdb_link": ""}
+
     # ── Execute ALL tasks concurrently ────────────────────────────
     try:
-        user_rating, enriched, similar_movies = await asyncio.gather(
+        user_rating, enriched, similar_movies, watch_providers_raw = await asyncio.gather(
             _fetch_user_rating(),
             _fetch_enriched(),
             _fetch_similar(),
+            _fetch_watch_providers(),
         )
 
         if enriched is None:
@@ -191,6 +200,10 @@ async def get_movie_details(
             cast=enriched.get("cast", []),
             cast_details=enriched.get("cast_details", []),
             similar_movies=similar_movies,
+            watch_providers=WatchProvidersResponse(
+                providers=[WatchProviderModel(**p) for p in watch_providers_raw.get("providers", [])],
+                tmdb_link=watch_providers_raw.get("tmdb_link", "")
+            )
         )
     except HTTPException:
         raise
@@ -270,4 +283,61 @@ def swipe_movie(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save swipe",
+        )
+
+
+@router.delete("/{movie_id}/swipe", response_model=MessageResponse)
+def delete_swipe(
+    movie_id: int,
+    user_id: str = Depends(get_current_user_id),
+    repository: MovieRepository = Depends(get_movie_repository),
+):
+    """
+    Delete a swipe (undo like or pass).
+    
+    Args:
+        movie_id: The movie ID
+    
+    Returns:
+        Success message
+    """
+    try:
+        repository.delete_swipe(movie_id, user_id)
+        logger.info(f"Swipe deleted: User {user_id} - Movie {movie_id}")
+        return MessageResponse(message="Swipe deleted successfully")
+    except Exception as e:
+        logger.error(f"Failed to delete swipe for user {user_id}, movie {movie_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete swipe",
+        )
+
+
+@router.patch("/{movie_id}/watch-status", response_model=MessageResponse)
+def update_watch_status(
+    movie_id: int,
+    request: WatchStatusRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    """
+    Update the watch status for a movie (watched, watch_later, favorite, dropped).
+    Send null to clear the status.
+    """
+    # Validate status value
+    if request.watch_status is not None and request.watch_status not in VALID_WATCH_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid watch_status. Must be one of: {', '.join(VALID_WATCH_STATUSES)}",
+        )
+
+    try:
+        ds = SupabaseDataSource()
+        ds.update_watch_status(user_id, movie_id, request.watch_status)
+        status_text = request.watch_status or 'cleared'
+        return MessageResponse(message=f"Watch status updated to '{status_text}'")
+    except Exception as e:
+        logger.error(f"Failed to update watch status for user {user_id}, movie {movie_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update watch status",
         )

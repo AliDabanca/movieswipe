@@ -85,12 +85,8 @@ class MoviesBloc extends Bloc<MoviesEvent, MoviesState> {
     );
 
     result.fold(
-      (failure) {
-        print('❌ Swipe error: ${failure.message}');
-      },
-      (_) {
-        print('✅ Swipe saved for movie ${event.movieId}');
-      },
+      (failure) {},
+      (_) {},
     );
   }
 

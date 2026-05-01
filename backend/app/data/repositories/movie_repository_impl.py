@@ -165,6 +165,15 @@ class MovieRepositoryImpl(MovieRepository):
         
         action = "LIKE" if is_like else "PASS"
         print(f"✅ Swipe saved to DB: User {user_id} - Movie {movie_id} - {action} (Rating: {rating})")
+
+    def delete_swipe(self, movie_id: int, user_id: str) -> None:
+        """Delete a swipe record (unlike/unpass)."""
+        try:
+            self.supabase_ds.delete_swipe(user_id, movie_id)
+            print(f"✅ Swipe deleted from DB: User {user_id} - Movie {movie_id}")
+        except Exception as e:
+            print(f"❌ Failed to delete swipe for user {user_id}, movie {movie_id}: {e}")
+            raise e
     
     def _extract_genre(self, tmdb_movie: dict) -> str:
         """

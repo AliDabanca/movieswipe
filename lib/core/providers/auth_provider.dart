@@ -13,6 +13,11 @@ class AuthProvider extends ChangeNotifier {
   List<int> _pinnedMovieIds = [];
   bool _hasProfile = false;
   bool _profileChecked = false;
+  bool _needsEmailConfirmation = false;
+  bool _onboardingCompleted = false;
+
+  /// Guards against concurrent auth operations
+  bool _isAuthOperationInProgress = false;
 
   AuthProvider() {
     _init();
@@ -32,48 +37,60 @@ class AuthProvider extends ChangeNotifier {
   List<int> get pinnedMovieIds => _pinnedMovieIds;
   bool get hasProfile => _hasProfile;
   bool get profileChecked => _profileChecked;
+  bool get onboardingCompleted => _onboardingCompleted;
+  bool get needsEmailConfirmation => _needsEmailConfirmation;
 
   SupabaseClient get _client => Supabase.instance.client;
 
   void _init() {
-    // Check current session
     _user = _client.auth.currentUser;
-    _isLoading = false;
-
+    
     if (_user != null) {
+      _isLoading = true;
       _checkProfile();
     } else {
+      _isLoading = false;
       _profileChecked = true;
+      notifyListeners();
     }
 
-    notifyListeners();
-
-    // Listen to auth state changes
     _client.auth.onAuthStateChange.listen((data) {
-      final previousUser = _user;
-      _user = data.session?.user;
-
-      if (_user != null) {
-        if (previousUser?.id != _user?.id) {
-          _profileChecked = false;
-          _checkProfile();
-        }
-      } else {
+      final newUser = data.session?.user;
+      
+      if (newUser == null && _user != null) {
+        _user = null;
         _username = null;
+        _displayName = null;
+        _avatarUrl = null;
+        _coverPhotoUrl = null;
         _hasProfile = false;
         _profileChecked = true;
+        _isLoading = false;
+        notifyListeners();
+        return;
       }
 
-      notifyListeners();
+      if (newUser != null && (newUser.id != _user?.id || !_profileChecked)) {
+        _user = newUser;
+        _needsEmailConfirmation = false;
+        _profileChecked = false;
+        _checkProfile();
+      }
     });
   }
 
-  /// Check if user has a profile with username
   Future<void> _checkProfile() async {
+    if (_user == null) {
+      _profileChecked = true;
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
+
     try {
       final response = await _client
           .from('profiles')
-          .select('username, display_name, avatar_url, cover_photo_url, pinned_movie_ids')
+          .select('username, display_name, avatar_url, cover_photo_url, pinned_movie_ids, onboarding_completed')
           .eq('id', _user!.id)
           .maybeSingle();
 
@@ -83,25 +100,24 @@ class AuthProvider extends ChangeNotifier {
         _avatarUrl = response['avatar_url'] as String?;
         _coverPhotoUrl = response['cover_photo_url'] as String?;
         _pinnedMovieIds = List<int>.from(response['pinned_movie_ids'] ?? []);
+        _onboardingCompleted = response['onboarding_completed'] as bool? ?? false;
         _hasProfile = _username != null;
       } else {
         _hasProfile = false;
         _username = null;
-        _displayName = null;
-        _avatarUrl = null;
-        _coverPhotoUrl = null;
-        _pinnedMovieIds = [];
+        _onboardingCompleted = false;
       }
     } catch (e) {
       debugPrint('Profile check error: $e');
       _hasProfile = false;
-      _username = null;
+    } finally {
+      _profileChecked = true;
+      _isLoading = false;
+      notifyListeners();
     }
-    _profileChecked = true;
-    notifyListeners();
   }
 
-  /// Check if username is available (for real-time validation)
+  /// Check if username is available (RPC call)
   Future<bool> isUsernameAvailable(String username) async {
     try {
       final response = await _client.rpc(
@@ -115,85 +131,16 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Set username for current user (creates profile)
-  Future<bool> setUsername(String username) async {
-    if (_user == null) return false;
-
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      await _client.from('profiles').insert({
-        'id': _user!.id,
-        'username': username,
-      });
-
-      _username = username;
-      _hasProfile = true;
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } on PostgrestException catch (e) {
-      if (e.code == '23505') {
-        _errorMessage = 'Bu kullanıcı adı zaten alınmış';
-      } else if (e.code == '23514') {
-        _errorMessage = 'Kullanıcı adı sadece harf ve rakam içerebilir (3-20 karakter)';
-      } else {
-        _errorMessage = 'Profil oluşturulamadı: ${e.message}';
-      }
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    } catch (e) {
-      _errorMessage = 'Bir hata oluştu: $e';
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  /// Sign up with email and password
-  Future<bool> signUp(String email, String password) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      final response = await _client.auth.signUp(
-        email: email,
-        password: password,
-      );
-
-      _user = response.user;
-      _hasProfile = false;
-      _profileChecked = true;
-      _isLoading = false;
-      notifyListeners();
-      return _user != null;
-    } on AuthException catch (e) {
-      _errorMessage = e.message;
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    } catch (e) {
-      _errorMessage = 'Bir hata oluştu: $e';
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  /// Sign in with email or username and password
   Future<bool> signIn(String identifier, String password) async {
+    if (_isAuthOperationInProgress) return false;
+    _isAuthOperationInProgress = true;
+
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
       String email = identifier.trim();
-
-      // If it's not an email, try to resolve as username
       if (!email.contains('@')) {
         final resolvedEmail = await _client.rpc(
           'get_email_from_username',
@@ -203,57 +150,94 @@ class AuthProvider extends ChangeNotifier {
         if (resolvedEmail == null) {
           _errorMessage = 'Kullanıcı adı bulunamadı';
           _isLoading = false;
+          _isAuthOperationInProgress = false;
           notifyListeners();
           return false;
         }
         email = resolvedEmail as String;
-        // Optimistic update: we know they have a profile since we found the email via username
-        _username = identifier.trim();
-        _hasProfile = true;
-        _profileChecked = true;
-      } else {
-        // If logging in via email, ensure we re-check profile
-        _profileChecked = false;
       }
 
-      final response = await _client.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
-
-      _user = response.user;
-      _isLoading = false;
-      notifyListeners();
-
-      // Profile check happens via auth state change listener
-      return _user != null;
+      await _client.auth.signInWithPassword(email: email, password: password);
+      _needsEmailConfirmation = false;
+      _isAuthOperationInProgress = false;
+      return true;
     } on AuthException catch (e) {
-      if (e.message.contains('Invalid login credentials')) {
-        _errorMessage = 'Hatalı e-posta/kullanıcı adı veya şifre';
-      } else {
-        _errorMessage = e.message;
-      }
+      _errorMessage = _mapAuthError(e);
       _isLoading = false;
+      _isAuthOperationInProgress = false;
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Bir hata oluştu: $e';
+      _errorMessage = _mapGenericError(e);
       _isLoading = false;
+      _isAuthOperationInProgress = false;
       notifyListeners();
       return false;
     }
   }
 
-  /// Sign out
-  Future<void> signOut() async {
-    await _client.auth.signOut();
-    _user = null;
-    _username = null;
-    _hasProfile = false;
+  Future<bool> signUp(String email, String password) async {
+    if (_isAuthOperationInProgress) return false;
+    _isAuthOperationInProgress = true;
+
+    _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
+
+    try {
+      final response = await _client.auth.signUp(email: email, password: password);
+      if (response.user != null && response.user!.emailConfirmedAt == null) {
+        await _client.auth.signOut();
+        _needsEmailConfirmation = true;
+        _isLoading = false;
+        _isAuthOperationInProgress = false;
+        notifyListeners();
+        return true;
+      }
+      _isAuthOperationInProgress = false;
+      return true;
+    } on AuthException catch (e) {
+      _errorMessage = _mapAuthError(e);
+      _isLoading = false;
+      _isAuthOperationInProgress = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = _mapGenericError(e);
+      _isLoading = false;
+      _isAuthOperationInProgress = false;
+      notifyListeners();
+      return false;
+    }
   }
 
-  /// Update user profile directly via Supabase
+  Future<bool> setUsername(String username) async {
+    if (_user == null) return false;
+    if (_isAuthOperationInProgress) return false;
+    _isAuthOperationInProgress = true;
+
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _client.from('profiles').upsert({'id': _user!.id, 'username': username});
+      _username = username;
+      _hasProfile = true;
+      _isLoading = false;
+      _isAuthOperationInProgress = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Hata oluştu. Tekrar deneyin.';
+      _isLoading = false;
+      _isAuthOperationInProgress = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// RESTORED: Update profile directly via Supabase
   Future<bool> updateProfile({
     String? username,
     String? displayName,
@@ -262,9 +246,7 @@ class AuthProvider extends ChangeNotifier {
     List<int>? pinnedMovieIds,
   }) async {
     if (_user == null) return false;
-
     _errorMessage = null;
-    notifyListeners();
 
     try {
       final updateData = <String, dynamic>{};
@@ -278,7 +260,7 @@ class AuthProvider extends ChangeNotifier {
 
       await _client.from('profiles').update(updateData).eq('id', _user!.id);
 
-      // Update local state
+      // Local State Update
       if (username != null) _username = username;
       if (displayName != null) _displayName = displayName;
       if (avatarUrl != null) _avatarUrl = avatarUrl;
@@ -294,9 +276,68 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Clear error message
+  void dismissEmailConfirmation() {
+    _needsEmailConfirmation = false;
+    notifyListeners();
+  }
+
+  Future<bool> resetPassword(String email) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _client.auth.resetPasswordForEmail(email.trim());
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Hata oluştu';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Mark onboarding as completed in Supabase and locally
+  Future<void> completeOnboarding() async {
+    if (_user == null) return;
+    try {
+      await _client.from('profiles').update(
+        {'onboarding_completed': true},
+      ).eq('id', _user!.id);
+      _onboardingCompleted = true;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Failed to mark onboarding completed: $e');
+    }
+  }
+
+  Future<void> signOut() async {
+    await _client.auth.signOut();
+    _user = null;
+    _username = null;
+    _displayName = null;
+    _avatarUrl = null;
+    _coverPhotoUrl = null;
+    _hasProfile = false;
+    _onboardingCompleted = false;
+    _profileChecked = true;
+    notifyListeners();
+  }
+
   void clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+
+  String _mapAuthError(AuthException e) {
+    final msg = e.message.toLowerCase();
+    if (msg.contains('invalid login credentials')) return 'E-posta veya şifre hatalı.';
+    if (msg.contains('email not confirmed')) return 'E-posta doğrulanmadı.';
+    if (msg.contains('already registered')) return 'Bu e-posta zaten kayıtlı.';
+    return 'Hata: ${e.message}';
+  }
+
+  String _mapGenericError(dynamic e) {
+    return 'Bir bağlantı hatası oluştu.';
   }
 }

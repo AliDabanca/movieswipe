@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:get_it/get_it.dart';
+import 'package:provider/provider.dart';
 import 'package:movieswipe/features/movies/domain/entities/movie.dart';
 import 'package:movieswipe/features/movies/data/models/movie_model.dart';
 import 'package:movieswipe/features/movies/data/datasources/movie_remote_datasource.dart';
 import 'package:movieswipe/core/network/api_client.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:provider/provider.dart';
 import 'package:movieswipe/core/providers/liked_movies_provider.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_bloc.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_event.dart';
@@ -38,7 +38,11 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   void initState() {
     super.initState();
     _loadDetails();
-    _localRating = widget.movie.userRating;
+    // Check LikedMoviesProvider for the most up-to-date rating first,
+    // since widget.movie.userRating may be stale (e.g. from AI results list).
+    final providerRating = Provider.of<LikedMoviesProvider>(context, listen: false)
+        .getMovieRating(widget.movie.id);
+    _localRating = providerRating ?? widget.movie.userRating;
   }
 
   Future<void> _loadDetails() async {
@@ -46,16 +50,13 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       final apiClient = GetIt.instance<ApiClient>();
       final datasource = MovieRemoteDataSourceImpl(apiClient: apiClient);
 
-      // Fetch movie details and watch providers concurrently
-      final results = await Future.wait([
-        datasource.getMovieDetails(widget.movie.id),
-        apiClient.get('/movies/${widget.movie.id}/watch-providers').catchError((_) => null),
-      ]);
+      // Unified call: Watch providers now come embedded in movie details
+      final detail = await datasource.getMovieDetails(widget.movie.id);
 
       if (mounted) {
         setState(() {
-          _detail = results[0] as MovieDetailModel;
-          _watchProvidersData = results[1] as Map<String, dynamic>?;
+          _detail = detail;
+          _watchProvidersData = detail.watchProviders;
           _isLoading = false;
         });
       }
@@ -75,21 +76,26 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
     try {
       final apiClient = ApiClient();
-      // Call swipe endpoint with isLike=true and the new rating
       await apiClient.post(
         '/movies/${widget.movie.id}/swipe',
         body: {'isLike': true, 'rating': rating},
       );
       
       if (mounted) {
-        // Update local provider state so it reflects in My List immediately
-        context.read<LikedMoviesProvider>().updateMovieRating(widget.movie.id, rating);
+        final likedProvider = context.read<LikedMoviesProvider>();
+        // Pass a movie copy with the correct rating so it's stored correctly from the start
+        final ratedMovie = widget.movie.copyWith(userRating: rating);
+        likedProvider.addLikedMovie(ratedMovie);
         
-        // NEW: Also update MoviesBloc so the card in the background is updated
-        context.read<MoviesBloc>().add(UpdateMovieRatingEvent(
-          movieId: widget.movie.id,
-          rating: rating,
-        ));
+        // MoviesBloc may not be available if we navigated from SmartDiscoveryPage
+        try {
+          context.read<MoviesBloc>().add(UpdateMovieRatingEvent(
+            movieId: widget.movie.id,
+            rating: rating,
+          ));
+        } catch (_) {
+          // MoviesBloc not in widget tree — swipe page sync skipped, that's OK
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -192,10 +198,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                 ],
                 const SizedBox(height: 20),
                 _buildOverview(d),
-                if (_watchProvidersData != null) ...[
-                  const SizedBox(height: 24),
-                  _buildWatchProviders(),
-                ],
+                const SizedBox(height: 24),
+                _buildWatchProviders(),
                 if (d.director != null) ...[
                   const SizedBox(height: 24),
                   _buildDirector(d.director!),
@@ -256,7 +260,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                   color: const Color(0xFF1A1A2E),
                   child: const Center(child: CircularProgressIndicator()),
                 ),
-                errorWidget: (_, __, ___) => Container(
+                errorWidget: (context, url, error) => Container(
                   color: const Color(0xFF1A1A2E),
                   child: const Icon(Icons.movie, size: 80, color: Colors.grey),
                 ),
@@ -357,13 +361,55 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             
             return GestureDetector(
               onTap: () => _updateRating(starIndex),
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: Icon(
-                  isFilled ? Icons.star : Icons.star_border,
-                  color: isFilled ? const Color(0xFFFFD700) : Colors.white.withOpacity(0.3),
-                  size: 32,
-                ),
+              child: TweenAnimationBuilder<double>(
+                key: ValueKey('star_${starIndex}_${isFilled}_$_localRating'),
+                tween: Tween<double>(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutBack,
+                builder: (context, value, child) {
+                  // "Burst" effect: scales up and glows peak at 30% of animation, then settles
+                  const peak = 0.3;
+                  double scale;
+                  double blur;
+                  
+                  if (!isFilled) {
+                    scale = 1.0;
+                    blur = 0.0;
+                  } else {
+                    if (value < peak) {
+                      // Climb: 1.0 -> 1.5
+                      scale = 1.0 + (value / peak) * 0.5;
+                      blur = (value / peak) * 40.0;
+                    } else {
+                      // Settle: 1.5 -> 1.15
+                      final settleValue = (value - peak) / (1.0 - peak);
+                      scale = 1.5 - (settleValue * 0.35);
+                      blur = 40.0 - (settleValue * 28.0);
+                    }
+                  }
+
+                  return Transform.scale(
+                    scale: scale,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: Icon(
+                        isFilled ? Icons.star : Icons.star_border,
+                        color: isFilled ? const Color(0xFFFFD700) : Colors.white.withValues(alpha: 0.3),
+                        size: 32,
+                        shadows: isFilled ? [
+                          Shadow(
+                            color: const Color(0xFFFFD700).withValues(alpha: 0.6),
+                            blurRadius: blur,
+                          ),
+                          Shadow(
+                            color: const Color(0xFFFFD700).withValues(alpha: 0.3),
+                            blurRadius: blur * 1.8,
+                          ),
+                        ] : null,
+                      ),
+                    ),
+                  );
+                },
               ),
             );
           }),
@@ -455,8 +501,6 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     final providers = (_watchProvidersData?['providers'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final tmdbLink = _watchProvidersData?['tmdb_link'] as String?;
 
-    if (providers.isEmpty) return const SizedBox.shrink();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -492,18 +536,28 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           ],
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 48,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: providers.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final p = providers[index];
-              return _buildProviderChip(p);
-            },
+        if (providers.isNotEmpty)
+          SizedBox(
+            height: 48,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: providers.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final p = providers[index];
+                return _buildProviderChip(p);
+              },
+            ),
+          )
+        else
+          Text(
+            'Bu film için izleme bilgisi bulunamadı.',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.5),
+              fontSize: 13,
+              fontStyle: FontStyle.italic,
+            ),
           ),
-        ),
       ],
     );
   }
@@ -513,9 +567,9 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     return Container(
       padding: const EdgeInsets.only(right: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -553,7 +607,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
               Text(
                 _getProviderTypeName(provider['provider_type']),
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                   fontSize: 10,
                 ),
               ),
@@ -629,7 +683,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: castDetails.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 14),
+            separatorBuilder: (context, index) => const SizedBox(width: 14),
             itemBuilder: (context, index) {
               final actor = castDetails[index];
               return _buildCastCard(actor);
@@ -698,25 +752,18 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           ),
         ),
         const SizedBox(height: 16),
-        movies.length > 4
-            ? SizedBox(
-                height: 200,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: movies.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    final movie = movies[index];
-                    return _buildSimilarMovieCard(movie);
-                  },
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children:
-                    movies.map((m) => _buildSimilarMovieCard(m)).toList(),
-              ),
+        SizedBox(
+          height: 220, // Increased height to ensure no clipping for text/poster
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: movies.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final movie = movies[index];
+              return _buildSimilarMovieCard(movie);
+            },
+          ),
+        ),
       ],
     );
   }
@@ -724,14 +771,23 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   Widget _buildSimilarMovieCard(MovieModel movie) {
     return GestureDetector(
       onTap: () {
+        // MoviesBloc may not be available (e.g. from SmartDiscoveryPage)
+        MoviesBloc? bloc;
+        try {
+          bloc = context.read<MoviesBloc>();
+        } catch (_) {}
+
+        Widget destination = MovieDetailPage(movie: movie.toEntity());
+        if (bloc != null) {
+          destination = BlocProvider.value(
+            value: bloc,
+            child: destination,
+          );
+        }
+
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => BlocProvider.value(
-              value: context.read<MoviesBloc>(),
-              child: MovieDetailPage(movie: movie.toEntity()),
-            ),
-          ),
+          MaterialPageRoute(builder: (_) => destination),
         );
       },
       child: Container(
@@ -759,7 +815,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                         color: Colors.grey[800],
                         child: const Center(child: CircularProgressIndicator()),
                       ),
-                      errorWidget: (_, __, ___) => Container(
+                      errorWidget: (context, url, error) => Container(
                         height: 150,
                         color: Colors.grey[800],
                         child: const Icon(

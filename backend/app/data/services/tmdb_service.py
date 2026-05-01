@@ -32,11 +32,26 @@ class TMDBService:
         await self.client.aclose()
 
     # ── Cache helpers ─────────────────────────────────────────────────
-    _redis_available: bool = True  # fail-fast flag
+    _redis_available: bool | None = None  # None = not checked yet
+
+    @classmethod
+    async def _check_redis_once(cls) -> bool:
+        """Check Redis availability exactly once per application lifetime."""
+        if cls._redis_available is not None:
+            return cls._redis_available
+        try:
+            rc = await get_redis_client()
+            await rc.ping()
+            cls._redis_available = True
+            logger.info("Redis connected successfully - caching enabled")
+        except Exception as e:
+            cls._redis_available = False
+            logger.warning(f"Redis unavailable - caching disabled for this session: {e}")
+        return cls._redis_available
 
     async def _cache_get(self, key: str) -> Optional[Any]:
         """Get a value from Redis cache. Returns None on miss or error."""
-        if not TMDBService._redis_available:
+        if not await TMDBService._check_redis_once():
             return None
         try:
             rc = await get_redis_client()
@@ -45,19 +60,19 @@ class TMDBService:
                 return json.loads(cached)
         except Exception as e:
             TMDBService._redis_available = False
-            logger.warning(f"Redis unavailable, disabling cache: {e}")
+            logger.warning(f"Redis error during get, disabling cache: {e}")
         return None
 
     async def _cache_set(self, key: str, value: Any, ttl: int) -> None:
         """Set a value in Redis cache with TTL. Silently ignores errors."""
-        if not TMDBService._redis_available:
+        if not await TMDBService._check_redis_once():
             return
         try:
             rc = await get_redis_client()
             await rc.set(key, json.dumps(value), ex=ttl)
         except Exception as e:
             TMDBService._redis_available = False
-            logger.warning(f"Redis unavailable, disabling cache: {e}")
+            logger.warning(f"Redis error during set, disabling cache: {e}")
 
     # ── List endpoints (with caching) ─────────────────────────────────
     async def get_popular_movies(self, page: int = 1) -> List[Dict[str, Any]]:

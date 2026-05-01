@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
@@ -8,6 +9,7 @@ import 'package:movieswipe/features/movies/presentation/bloc/movies_bloc.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_event.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_state.dart';
 import 'package:movieswipe/features/movies/presentation/widgets/movie_card.dart';
+import 'package:movieswipe/features/movies/presentation/pages/smart_discovery_page.dart';
 
 
 /// Swipe page - main movie swiping interface
@@ -22,6 +24,8 @@ class _SwipePageState extends State<SwipePage> {
   CardSwiperController controller = CardSwiperController();
   // Key to force-rebuild CardSwiper when new batch arrives
   int _swiperGeneration = 0;
+  // Track the current batch's movie IDs to distinguish new batches from rating updates
+  List<int> _currentBatchIds = [];
 
   @override
   void dispose() {
@@ -34,12 +38,20 @@ class _SwipePageState extends State<SwipePage> {
     return BlocListener<MoviesBloc, MoviesState>(
       listener: (context, state) {
         if (state is MoviesLoaded) {
-          // New batch arrived — rebuild the swiper with a fresh controller
-          setState(() {
-            controller.dispose();
-            controller = CardSwiperController();
-            _swiperGeneration++;
-          });
+          // Check if this is a genuinely new batch or just a rating update
+          final newIds = state.movies.map((m) => m.id).toList();
+                    final isSameBatch = listEquals(newIds, _currentBatchIds);
+
+          if (!isSameBatch) {
+            // New batch arrived — rebuild the swiper with a fresh controller
+            setState(() {
+              controller.dispose();
+              controller = CardSwiperController();
+              _swiperGeneration++;
+              _currentBatchIds = newIds;
+            });
+          }
+          // If same batch (e.g. rating update), do nothing — swiper keeps its position
         }
       },
       child: BlocBuilder<MoviesBloc, MoviesState>(
@@ -147,14 +159,21 @@ class _SwipePageState extends State<SwipePage> {
                   final userId = Provider.of<AuthProvider>(context, listen: false).currentUserId;
                   
                   if (userId == null) {
-                    print ('❌ No user ID found!');
                     return true;
                   }
 
                   // Optimistic UI update - update local state immediately
                   final likedMoviesProvider = Provider.of<LikedMoviesProvider>(context, listen: false);
+                  
+                  // Crucial: Fetch the latest rating from provider in case it was updated in DetailPage
+                  final currentRating = likedMoviesProvider.getMovieRating(movie.id) ?? movie.userRating;
+
                   if (isLike) {
-                    likedMoviesProvider.addLikedMovie(movie);
+                    // Use a movie copy with the most up-to-date rating
+                    final movieWithRating = currentRating != null && currentRating != movie.userRating
+                        ? movie.copyWith(userRating: currentRating)
+                        : movie;
+                    likedMoviesProvider.addLikedMovie(movieWithRating);
                   } else {
                     likedMoviesProvider.addPass();
                   }
@@ -164,7 +183,7 @@ class _SwipePageState extends State<SwipePage> {
                           movieId: movie.id,
                           isLike: isLike,
                           userId: userId,
-                          rating: movie.userRating,
+                          rating: currentRating,
                         ),
                       );
                   return true;
@@ -203,13 +222,35 @@ class _SwipePageState extends State<SwipePage> {
                 ),
 
                 // Undo button
-                FloatingActionButton(
+                FloatingActionButton.small(
                   heroTag: 'undo',
                   onPressed: () {
                     controller.undo();
                   },
                   backgroundColor: Colors.grey,
-                  child: const Icon(Icons.refresh, size: 28),
+                  child: const Icon(Icons.refresh, size: 22),
+                ),
+
+                // Smart AI Discovery button
+                FloatingActionButton.small(
+                  heroTag: 'smart_discovery',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SmartDiscoveryPage()),
+                    );
+                  },
+                  backgroundColor: const Color(0xFF7C4DFF),
+                  child: ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [Color(0xFFE040FB), Colors.white],
+                    ).createShader(bounds),
+                    child: const Icon(
+                      Icons.auto_awesome,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
                 ),
 
                 // Like button

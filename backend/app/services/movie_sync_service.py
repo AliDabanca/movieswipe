@@ -85,6 +85,10 @@ class MovieSyncService:
                     if original_language in ["hi", "zh", "ja", "ko", "cn", "tw"]:
                         continue
                     
+                    # Skip movies without a poster
+                    if not tmdb_movie.get("poster_path"):
+                        continue
+                    
                     movie_dict = {
                         "id": tmdb_movie["id"],
                         "name": tmdb_movie.get("title", tmdb_movie.get("name", "Unknown")),

@@ -1,6 +1,13 @@
 """Movie Pydantic model for data layer."""
 
 from pydantic import BaseModel, Field
+from typing import Optional
+
+
+class RecommendationReasonModel(BaseModel):
+    """Why a movie was recommended — contextual metadata, not intrinsic."""
+    code: str = Field(..., description="Machine-readable reason code")
+    text: str = Field(..., description="User-facing explanation")
 
 
 class MovieModel(BaseModel):
@@ -14,6 +21,7 @@ class MovieModel(BaseModel):
     release_date: str | None = Field(None, description="Release date")
     vote_average: float | None = Field(None, description="TMDB vote average")
     user_rating: int | None = Field(None, ge=1, le=5, description="Personal rating (1-5 stars)")
+    recommendation_reason: Optional[RecommendationReasonModel] = Field(None, description="Why this movie was recommended")
 
     class Config:
         from_attributes = True
@@ -39,11 +47,15 @@ class MovieModel(BaseModel):
             release_date=self.release_date,
             vote_average=self.vote_average,
             user_rating=self.user_rating,
+            recommendation_reason=self.recommendation_reason.model_dump() if self.recommendation_reason else None,
         )
 
     @classmethod
     def from_entity(cls, entity):
         """Create from domain entity."""
+        reason = None
+        if entity.recommendation_reason:
+            reason = RecommendationReasonModel(**entity.recommendation_reason)
         return cls(
             id=entity.id,
             name=entity.name,
@@ -53,6 +65,7 @@ class MovieModel(BaseModel):
             release_date=entity.release_date,
             vote_average=entity.vote_average,
             user_rating=entity.user_rating,
+            recommendation_reason=reason,
         )
 
 
@@ -61,6 +74,20 @@ class CastMember(BaseModel):
     name: str = Field(..., description="Actor name")
     character: str = Field("", description="Character played")
     profile_path: str | None = Field(None, description="TMDB profile image path")
+
+
+class WatchProviderModel(BaseModel):
+    """Single streaming/watch provider."""
+    provider_id: int = Field(..., description="TMDB provider ID")
+    provider_name: str = Field(..., description="Provider name (e.g. Netflix)")
+    logo_path: str | None = Field(None, description="TMDB logo path")
+    provider_type: str = Field(..., description="flatrate, rent, or buy")
+
+
+class WatchProvidersResponse(BaseModel):
+    """Response model for watch providers endpoint."""
+    providers: list[WatchProviderModel] = Field(default_factory=list)
+    tmdb_link: str = Field("", description="TMDB page link for this movie's providers")
 
 
 class MovieDetailModel(MovieModel):
@@ -76,20 +103,7 @@ class MovieDetailModel(MovieModel):
     cast_details: list[CastMember] = Field(default_factory=list, description="Cast with character info")
     vote_count: int = Field(0, description="Number of votes")
     similar_movies: list[MovieModel] = Field(default_factory=list, description="Similar movies")
+    watch_providers: WatchProvidersResponse | None = Field(None, description="Streaming/Watch providers information")
 
     class Config:
         from_attributes = True
-
-
-class WatchProviderModel(BaseModel):
-    """Single streaming/watch provider."""
-    provider_id: int = Field(..., description="TMDB provider ID")
-    provider_name: str = Field(..., description="Provider name (e.g. Netflix)")
-    logo_path: str | None = Field(None, description="TMDB logo path")
-    provider_type: str = Field(..., description="flatrate, rent, or buy")
-
-
-class WatchProvidersResponse(BaseModel):
-    """Response model for watch providers endpoint."""
-    providers: list[WatchProviderModel] = Field(default_factory=list)
-    tmdb_link: str = Field("", description="TMDB page link for this movie's providers")
