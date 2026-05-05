@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/social_entities.dart';
+import '../../domain/entities/notification_entities.dart';
 
 abstract class SocialState extends Equatable {
   const SocialState();
@@ -44,6 +45,20 @@ class SocialSuccess extends SocialState {
   const SocialSuccess(this.message);
   @override
   List<Object?> get props => [message];
+}
+
+class FriendCountLoaded extends SocialState {
+  final int count;
+  const FriendCountLoaded(this.count);
+  @override
+  List<Object?> get props => [count];
+}
+
+class NotificationsLoaded extends SocialState {
+  final List<NotificationEntity> notifications;
+  const NotificationsLoaded(this.notifications);
+  @override
+  List<Object?> get props => [notifications];
 }
 
 class SocialError extends SocialState {

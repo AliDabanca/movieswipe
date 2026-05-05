@@ -4,6 +4,7 @@ import random
 from typing import List, Dict, Any, Optional
 
 from app.data.datasources.supabase_datasource import SupabaseDataSource
+from app.services.notification_service import NotificationService
 from app.core.errors import ServerError, NotFoundError
 from app.core.logger import logger
 
@@ -13,6 +14,7 @@ class SocialService:
 
     def __init__(self):
         self.db = SupabaseDataSource()
+        self.notifications = NotificationService()
 
     # ── Friend List ───────────────────────────────────────────
 
@@ -33,6 +35,18 @@ class SocialService:
         except Exception as e:
             logger.error(f"Failed to fetch friends for {user_id}: {e}", exc_info=True)
             raise ServerError("Failed to fetch friends")
+
+    def get_friend_count(self, user_id: str) -> int:
+        """Count the number of friends for a user."""
+        try:
+            res = self.db.client.table("friendships") \
+                .select("id", count="exact") \
+                .eq("user_id", user_id) \
+                .execute()
+            return res.count or 0
+        except Exception as e:
+            logger.error(f"Failed to get friend count for {user_id}: {e}", exc_info=True)
+            return 0
 
     def _safe_get_data(self, response: Any) -> List[Dict[str, Any]]:
         """Safely extract data from Supabase APIResponse to avoid property AttributeErrors."""
@@ -108,6 +122,14 @@ class SocialService:
                 }) \
                 .execute()
 
+            # Create notification for the receiver
+            self.notifications.create_notification(
+                user_id=receiver_id,
+                actor_id=sender_id,
+                n_type="new_request",
+                related_id=res.data[0]["id"] if res.data else None
+            )
+
             return {"message": "Friend request sent", "status": "sent"}
         except (NotFoundError, ServerError):
             raise
@@ -173,6 +195,14 @@ class SocialService:
                         {"user_id": receiver_id, "friend_id": sender_id},
                     ]) \
                     .execute()
+
+                # 4. Create notification for the sender
+                self.notifications.create_notification(
+                    user_id=sender_id,
+                    actor_id=receiver_id,
+                    n_type="request_accepted",
+                    related_id=request_id
+                )
             except Exception as e:
                 logger.warning(f"Failed to insert friendships (might already exist): {e}")
 

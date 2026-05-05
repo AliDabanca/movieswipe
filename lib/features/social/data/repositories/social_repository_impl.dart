@@ -4,6 +4,8 @@ import '../../../../core/network/api_client.dart';
 import '../../domain/entities/social_entities.dart';
 import '../../domain/repositories/social_repository.dart';
 import '../models/social_models.dart';
+import '../models/notification_models.dart';
+import '../../domain/entities/notification_entities.dart';
 
 class SocialRepositoryImpl implements SocialRepository {
   final ApiClient apiClient;
@@ -79,6 +81,37 @@ class SocialRepositoryImpl implements SocialRepository {
       final response = await apiClient.get('/social/search/$query');
       final List<dynamic> data = response as List<dynamic>;
       return Right(data.map((json) => FriendModel.fromJson(json as Map<String, dynamic>)).toList());
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, int>> getFriendCount(String userId) async {
+    try {
+      final response = await apiClient.get('/social/count/$userId');
+      return Right((response as Map<String, dynamic>)['count'] as int? ?? 0);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<NotificationEntity>>> getNotifications() async {
+    try {
+      final response = await apiClient.get('/notifications/');
+      final List<dynamic> data = response as List<dynamic>;
+      return Right(data.map((json) => NotificationModel.fromJson(json as Map<String, dynamic>)).toList());
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> markNotificationAsRead(String notificationId) async {
+    try {
+      await apiClient.post('/notifications/$notificationId/read');
+      return const Right(unit);
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }

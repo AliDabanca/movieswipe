@@ -7,6 +7,11 @@ import 'package:movieswipe/features/users/presentation/widgets/avatar_selection_
 import 'package:movieswipe/features/users/presentation/widgets/genre_dna_chart.dart';
 import 'package:movieswipe/features/users/presentation/widgets/current_mood_aura.dart';
 import 'package:movieswipe/features/users/presentation/widgets/cover_selection_sheet.dart';
+import 'package:movieswipe/features/social/presentation/pages/social_dashboard_page.dart';
+import 'package:movieswipe/features/social/presentation/bloc/social_bloc.dart';
+import 'package:movieswipe/features/social/presentation/bloc/social_event.dart';
+import 'package:movieswipe/features/social/presentation/bloc/social_state.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -17,6 +22,21 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  int _pendingRequestsCount = 0;
+  bool _hasUnreadNotifications = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      if (auth.currentUserId != null) {
+        context.read<SocialBloc>().add(LoadFriendCountEvent(auth.currentUserId!));
+        context.read<SocialBloc>().add(LoadIncomingRequestsEvent());
+        context.read<SocialBloc>().add(LoadNotificationsEvent());
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,9 +47,18 @@ class _ProfilePageState extends State<ProfilePage> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: Colors.transparent,
+    return BlocListener<SocialBloc, SocialState>(
+      listener: (context, state) {
+        if (state is IncomingRequestsLoaded) {
+          setState(() => _pendingRequestsCount = state.requests.length);
+        } else if (state is NotificationsLoaded) {
+          final unread = state.notifications.any((n) => !n.isRead);
+          setState(() => _hasUnreadNotifications = unread);
+        }
+      },
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: Colors.transparent,
       endDrawer: _buildDrawer(context, auth, likedProvider),
       body: Stack(
         children: [
@@ -73,6 +102,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ],
       ),
+    ),
     );
   }
 
@@ -133,6 +163,22 @@ class _ProfilePageState extends State<ProfilePage> {
                     child: Column(
                       children: [
                         const SizedBox(height: 8),
+                        
+                        // Notifications Section
+                        if (_pendingRequestsCount > 0)
+                          Column(
+                            children: [
+                              _buildDrawerItem(
+                                icon: Icons.notifications_active_rounded,
+                                label: 'Bekleyen İstekler ($_pendingRequestsCount)',
+                                onTap: () {
+                                  Navigator.pop(context); // Close drawer
+                                  _showSocialDashboard(context, initialTab: 1); // Open social modal
+                                },
+                              ),
+                              Divider(color: Colors.white.withValues(alpha: 0.06)),
+                            ],
+                          ),
 
                         // Stats - collapsible
                         Theme(
@@ -394,17 +440,34 @@ class _ProfilePageState extends State<ProfilePage> {
               letterSpacing: -0.5,
             ),
           ),
-          IconButton(
-            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(12),
+          Row(
+            children: [
+              if (_pendingRequestsCount > 0 || _hasUnreadNotifications)
+                IconButton(
+                  onPressed: () => _showSocialDashboard(context, initialTab: 2),
+                  icon: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE94560).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.notifications_active_rounded,
+                        color: Color(0xFFE94560), size: 20),
+                  ),
+                ),
+              IconButton(
+                onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.menu_rounded,
+                      color: Colors.white, size: 20),
+                ),
               ),
-              child: const Icon(Icons.menu_rounded,
-                  color: Colors.white, size: 20),
-            ),
+            ],
           ),
         ],
       ),
@@ -501,6 +564,46 @@ class _ProfilePageState extends State<ProfilePage> {
                         color: Colors.white.withValues(alpha: 0.5),
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    GestureDetector(
+                      onTap: () => _showSocialDashboard(context),
+                      child: BlocBuilder<SocialBloc, SocialState>(
+                        buildWhen: (prev, current) => current is FriendCountLoaded,
+                        builder: (context, state) {
+                          int count = 0;
+                          if (state is FriendCountLoaded) {
+                            count = state.count;
+                          }
+                          return Row(
+                            children: [
+                              Icon(Icons.group_rounded, size: 14, color: const Color(0xFFE94560).withValues(alpha: 0.7)),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$count Arkadaş',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFFE94560),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              // Notification dot for pending requests or unread notifications
+                              if (_pendingRequestsCount > 0 || _hasUnreadNotifications)
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFE94560),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              const SizedBox(width: 4),
+                              Icon(Icons.chevron_right_rounded, size: 14, color: const Color(0xFFE94560).withValues(alpha: 0.5)),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -547,6 +650,43 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showSocialDashboard(BuildContext context, {int initialTab = 0}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => BlocProvider.value(
+        value: context.read<SocialBloc>(),
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.9,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (_, controller) => Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F0F1E),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Expanded(child: SocialDashboardPage(initialTab: initialTab)),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

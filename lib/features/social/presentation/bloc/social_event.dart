@@ -44,3 +44,19 @@ class LoadFriendProfileEvent extends SocialEvent {
   @override
   List<Object?> get props => [friendId];
 }
+
+class LoadFriendCountEvent extends SocialEvent {
+  final String userId;
+  const LoadFriendCountEvent(this.userId);
+  @override
+  List<Object?> get props => [userId];
+}
+
+class LoadNotificationsEvent extends SocialEvent {}
+
+class MarkNotificationReadEvent extends SocialEvent {
+  final String notificationId;
+  const MarkNotificationReadEvent(this.notificationId);
+  @override
+  List<Object?> get props => [notificationId];
+}

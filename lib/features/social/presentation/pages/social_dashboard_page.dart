@@ -5,10 +5,12 @@ import '../bloc/social_bloc.dart';
 import '../bloc/social_event.dart';
 import '../bloc/social_state.dart';
 import '../../domain/entities/social_entities.dart';
+import '../../domain/entities/notification_entities.dart';
 import 'friend_profile_page.dart';
 
 class SocialDashboardPage extends StatefulWidget {
-  const SocialDashboardPage({super.key});
+  final int initialTab;
+  const SocialDashboardPage({super.key, this.initialTab = 0});
 
   @override
   State<SocialDashboardPage> createState() => _SocialDashboardPageState();
@@ -21,30 +23,30 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
   int _currentTab = 0;
   List<FriendEntity>? _cachedFriends;
   List<FriendRequestEntity>? _cachedRequests;
+  List<NotificationEntity>? _cachedNotifications;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this, initialIndex: widget.initialTab);
+    _currentTab = widget.initialTab;
     _tabController.addListener(() {
       if (_tabController.index != _currentTab) {
         setState(() => _currentTab = _tabController.index);
-        if (_tabController.index == 0 && _cachedFriends == null) {
-          _loadTabData(0);
-        } else if (_tabController.index == 1 && _cachedRequests == null) {
-          _loadTabData(1);
-        }
+        _loadTabData(_tabController.index);
       }
     });
     // Initial load
-    context.read<SocialBloc>().add(LoadFriendsEvent());
+    _loadTabData(widget.initialTab);
   }
 
   void _loadTabData(int index) {
     if (index == 0) {
       context.read<SocialBloc>().add(LoadFriendsEvent());
-    } else {
+    } else if (index == 1) {
       context.read<SocialBloc>().add(LoadIncomingRequestsEvent());
+    } else if (index == 2) {
+      context.read<SocialBloc>().add(LoadNotificationsEvent());
     }
   }
 
@@ -59,52 +61,50 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(context),
-            _buildTabBar(),
-            Expanded(
-              child: BlocListener<SocialBloc, SocialState>(
-                listener: (context, state) {
-                  if (state is SocialSuccess) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(state.message),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.fixed,
-                      ),
-                    );
-                    // Clear caches to force reload
-                    setState(() {
-                      _cachedFriends = null;
-                      _cachedRequests = null;
-                    });
-                    _loadTabData(_currentTab);
-                  } else if (state is SocialError) {
-                    final isInfo = state.message.contains('Kendi kendine');
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(state.message),
-                        backgroundColor: isInfo ? Colors.blue : const Color(0xFFE94560),
-                        behavior: SnackBarBehavior.fixed,
-                      ),
-                    );
-                  }
-                },
-
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildFriendsTab(),
-                    _buildRequestsTab(),
-                  ],
-                ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeader(context),
+          _buildTabBar(),
+          Expanded(
+            child: BlocListener<SocialBloc, SocialState>(
+              listener: (context, state) {
+                if (state is SocialSuccess) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(state.message),
+                      backgroundColor: Colors.green,
+                      behavior: SnackBarBehavior.fixed,
+                    ),
+                  );
+                  // Clear caches to force reload
+                  setState(() {
+                    _cachedFriends = null;
+                    _cachedRequests = null;
+                  });
+                  _loadTabData(_currentTab);
+                } else if (state is SocialError) {
+                  final isInfo = state.message.contains('Kendi kendine');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(state.message),
+                      backgroundColor: isInfo ? Colors.blue : const Color(0xFFE94560),
+                      behavior: SnackBarBehavior.fixed,
+                    ),
+                  );
+                }
+              },
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildFriendsTab(),
+                  _buildRequestsTab(),
+                  _buildNotificationsTab(),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -116,7 +116,7 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const Text(
-            'Social',
+            'Sosyal',
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.w800,
@@ -150,6 +150,19 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
                       color: Color(0xFFE94560), size: 20),
                 ),
               ),
+              const SizedBox(width: 4),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.close_rounded,
+                      color: Colors.white54, size: 20),
+                ),
+              ),
             ],
           ),
         ],
@@ -169,18 +182,53 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
               color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: const Color(0xFFE94560),
-              indicatorWeight: 3,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white54,
-              labelStyle: const TextStyle(
-                  fontWeight: FontWeight.w600, fontSize: 14),
-              tabs: const [
-                Tab(text: 'Arkadaşlar'),
-                Tab(text: 'İstekler'),
-              ],
+            child: BlocBuilder<SocialBloc, SocialState>(
+              buildWhen: (prev, current) => current is IncomingRequestsLoaded,
+              builder: (context, state) {
+                int count = 0;
+                if (state is IncomingRequestsLoaded) {
+                  count = state.requests.length;
+                }
+                return TabBar(
+                  controller: _tabController,
+                  indicatorColor: const Color(0xFFE94560),
+                  indicatorWeight: 3,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white54,
+                  labelStyle: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 14),
+                  tabs: [
+                    const Tab(text: 'Arkadaşlar'),
+                    Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('İstekler'),
+                          if (count > 0) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFE94560),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                count.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const Tab(text: 'Bildirimler'),
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -528,6 +576,119 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
         child: _SearchSheet(cachedFriends: _cachedFriends),
       ),
     );
+  }
+
+  Widget _buildNotificationsTab() {
+    return BlocBuilder<SocialBloc, SocialState>(
+      buildWhen: (prev, current) =>
+          current is NotificationsLoaded ||
+          (current is SocialLoading && _currentTab == 2),
+      builder: (context, state) {
+        if (state is SocialLoading && _cachedNotifications == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        List<NotificationEntity> notifications = _cachedNotifications ?? [];
+        if (state is NotificationsLoaded) {
+          notifications = state.notifications;
+          _cachedNotifications = notifications;
+        }
+
+        if (notifications.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.notifications_none_rounded,
+                    size: 48, color: Colors.white.withValues(alpha: 0.2)),
+                const SizedBox(height: 16),
+                Text(
+                  'Henüz bildirim yok',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: notifications.length,
+          itemBuilder: (context, index) {
+            final notif = notifications[index];
+            String title = '';
+            IconData icon = Icons.notifications;
+            Color iconColor = Colors.blue;
+
+            if (notif.type == 'new_request') {
+              title =
+                  '${notif.actorDisplayName ?? notif.actorUsername} sana arkadaşlık isteği gönderdi.';
+              icon = Icons.person_add_rounded;
+              iconColor = const Color(0xFFE94560);
+            } else if (notif.type == 'request_accepted') {
+              title =
+                  '${notif.actorDisplayName ?? notif.actorUsername} arkadaşlık isteğini kabul etti!';
+              icon = Icons.check_circle_rounded;
+              iconColor = Colors.green;
+            }
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: notif.isRead
+                    ? Colors.white.withValues(alpha: 0.02)
+                    : Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: notif.isRead
+                      ? Colors.transparent
+                      : const Color(0xFFE94560).withValues(alpha: 0.3),
+                ),
+              ),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: iconColor.withValues(alpha: 0.1),
+                  child: Icon(icon, color: iconColor, size: 20),
+                ),
+                title: Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight:
+                        notif.isRead ? FontWeight.normal : FontWeight.bold,
+                  ),
+                ),
+                subtitle: Text(
+                  _formatDate(notif.createdAt),
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.3), fontSize: 12),
+                ),
+                onTap: () {
+                  if (!notif.isRead) {
+                    context
+                        .read<SocialBloc>()
+                        .add(MarkNotificationReadEvent(notif.id));
+                  }
+                  // Navigate to appropriate place based on type
+                  if (notif.type == 'new_request') {
+                    _tabController.animateTo(1);
+                  }
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+    if (diff.inMinutes < 60) return '${diff.inMinutes} dk önce';
+    if (diff.inHours < 24) return '${diff.inHours} sa önce';
+    return '${date.day}.${date.month}.${date.year}';
   }
 }
 

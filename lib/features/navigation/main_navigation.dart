@@ -6,7 +6,6 @@ import 'package:movieswipe/core/providers/liked_movies_provider.dart';
 import 'package:movieswipe/features/movies/presentation/pages/swipe_page.dart';
 import 'package:movieswipe/features/movies/presentation/pages/my_list_page.dart';
 import 'package:movieswipe/features/users/presentation/pages/profile_page.dart';
-import 'package:movieswipe/features/social/presentation/pages/social_dashboard_page.dart';
 import 'package:movieswipe/core/di/injection_container.dart';
 import 'package:movieswipe/core/presentation/widgets/global_app_background.dart';
 
@@ -28,7 +27,6 @@ class _MainNavigationState extends State<MainNavigation> {
   final List<Widget> _pages = const [
     SwipePage(),
     MyListPage(),
-    SocialDashboardPage(),
     ProfilePage(),
   ];
 
@@ -80,11 +78,6 @@ class _MainNavigationState extends State<MainNavigation> {
                 icon: Icon(Icons.favorite_outline),
                 selectedIcon: Icon(Icons.favorite),
                 label: 'My List',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.group_outlined),
-                selectedIcon: Icon(Icons.group),
-                label: 'Social',
               ),
               NavigationDestination(
                 icon: Icon(Icons.person_outline),
