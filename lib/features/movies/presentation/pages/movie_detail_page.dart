@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:movieswipe/core/presentation/widgets/logo_loader.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:get_it/get_it.dart';
@@ -131,7 +132,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
   Widget _buildLoading() {
     return const Center(
-      child: CircularProgressIndicator(color: Color(0xFFE50914)),
+      child: LogoLoader(size: 60),
     );
   }
 
@@ -261,7 +262,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                 fit: BoxFit.cover,
                 placeholder: (context, url) => Container(
                   color: const Color(0xFF1A1A2E),
-                  child: const Center(child: CircularProgressIndicator()),
+                  child: const Center(child: LogoLoader(size: 60)),
                 ),
                 errorWidget: (context, url, error) => Container(
                   color: const Color(0xFF1A1A2E),
@@ -947,7 +948,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                         height: 150,
                         width: 120,
                         color: Colors.grey[800],
-                        child: const Center(child: CircularProgressIndicator()),
+                        child: const Center(child: LogoLoader(size: 60)),
                       ),
                       errorWidget: (context, url, error) => Container(
                         height: 150,
@@ -1045,7 +1046,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.all(32),
-              child: Center(child: CircularProgressIndicator(color: Color(0xFFEC4899))),
+              child: Center(child: LogoLoader(size: 60)),
             )
           else if (_collections == null || _collections!.isEmpty)
             Padding(

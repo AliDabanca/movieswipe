@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:movieswipe/core/theme/app_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/social_bloc.dart';
 import '../bloc/social_event.dart';
@@ -180,7 +181,7 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
                     shape: BoxShape.circle,
                     border: Border.all(
                       color:
-                          const Color(0xFFE94560).withValues(alpha: 0.5),
+                          AppTheme.accent.withValues(alpha: 0.5),
                       width: 2,
                     ),
                     color: Colors.white.withValues(alpha: 0.05),

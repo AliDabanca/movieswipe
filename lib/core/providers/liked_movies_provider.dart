@@ -771,6 +771,8 @@ class LikedMoviesProvider extends ChangeNotifier {
     _currentMood = null;
     _currentEmoji = null;
     _isLoaded = false;
+    _isInitialized = false;
+    _isLoading = false;
     notifyListeners();
   }
 

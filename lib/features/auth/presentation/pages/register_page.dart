@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:movieswipe/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:movieswipe/core/providers/auth_provider.dart';
 
@@ -198,7 +199,7 @@ class _RegisterPageState extends State<RegisterPage>
                 height: 250,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFFE94560).withValues(alpha: 0.1),
+                  color: AppTheme.accent.withValues(alpha: 0.1),
                 ),
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
@@ -234,7 +235,7 @@ class _RegisterPageState extends State<RegisterPage>
                                 gradient: const LinearGradient(
                                   colors: [
                                     Color(0xFF4361EE),
-                                    Color(0xFFE94560),
+                                    AppTheme.accent,
                                   ],
                                 ),
                                 boxShadow: [
@@ -293,12 +294,12 @@ class _RegisterPageState extends State<RegisterPage>
                                     margin:
                                         const EdgeInsets.only(bottom: 20),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFE94560)
+                                      color: AppTheme.accent
                                           .withValues(alpha: 0.12),
                                       borderRadius:
                                           BorderRadius.circular(16),
                                       border: Border.all(
-                                        color: const Color(0xFFE94560)
+                                        color: AppTheme.accent
                                             .withValues(alpha: 0.3),
                                       ),
                                     ),
@@ -309,7 +310,7 @@ class _RegisterPageState extends State<RegisterPage>
                                               const EdgeInsets.all(6),
                                           decoration: BoxDecoration(
                                             color:
-                                                const Color(0xFFE94560)
+                                                AppTheme.accent
                                                     .withValues(
                                                         alpha: 0.2),
                                             shape: BoxShape.circle,
@@ -318,7 +319,7 @@ class _RegisterPageState extends State<RegisterPage>
                                               Icons
                                                   .error_outline_rounded,
                                               color:
-                                                  Color(0xFFE94560),
+                                                  AppTheme.accent,
                                               size: 18),
                                         ),
                                         const SizedBox(width: 12),
@@ -327,7 +328,7 @@ class _RegisterPageState extends State<RegisterPage>
                                             auth.errorMessage!,
                                             style: const TextStyle(
                                               color:
-                                                  Color(0xFFE94560),
+                                                  AppTheme.accent,
                                               fontSize: 13,
                                               fontWeight:
                                                   FontWeight.w500,
@@ -340,7 +341,7 @@ class _RegisterPageState extends State<RegisterPage>
                                           child: Icon(
                                             Icons.close_rounded,
                                             color:
-                                                const Color(0xFFE94560)
+                                                AppTheme.accent
                                                     .withValues(
                                                         alpha: 0.6),
                                             size: 18,
@@ -579,32 +580,30 @@ class _RegisterPageState extends State<RegisterPage>
                                         const SizedBox(height: 28),
 
                                         // Register button
-                                        SizedBox(
+                                        Container(
                                           width: double.infinity,
                                           height: 56,
+                                          decoration: BoxDecoration(
+                                            gradient: AppTheme.primaryGradient,
+                                            borderRadius: BorderRadius.circular(16),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: AppTheme.accent.withValues(alpha: 0.3),
+                                                blurRadius: 12,
+                                                offset: const Offset(0, 4),
+                                              ),
+                                            ],
+                                          ),
                                           child: ElevatedButton(
                                             onPressed: auth.isLoading
                                                 ? null
                                                 : _handleRegister,
-                                            style: ElevatedButton
-                                                .styleFrom(
-                                              backgroundColor:
-                                                  const Color(
-                                                      0xFFE94560),
-                                              foregroundColor:
-                                                  Colors.white,
-                                              disabledBackgroundColor:
-                                                  const Color(
-                                                          0xFFE94560)
-                                                      .withValues(
-                                                          alpha:
-                                                              0.4),
-                                              shape:
-                                                  RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius
-                                                        .circular(
-                                                            16),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.transparent,
+                                              shadowColor: Colors.transparent,
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(16),
                                               ),
                                               elevation: 0,
                                             ),
@@ -612,23 +611,17 @@ class _RegisterPageState extends State<RegisterPage>
                                                 ? const SizedBox(
                                                     width: 24,
                                                     height: 24,
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                      color: Colors
-                                                          .white,
-                                                      strokeWidth:
-                                                          2.5,
+                                                    child: CircularProgressIndicator(
+                                                      color: Colors.white,
+                                                      strokeWidth: 2.5,
                                                     ),
                                                   )
                                                 : const Text(
                                                     'Kayıt Ol',
                                                     style: TextStyle(
                                                       fontSize: 17,
-                                                      fontWeight:
-                                                          FontWeight
-                                                              .bold,
-                                                      letterSpacing:
-                                                          0.5,
+                                                      fontWeight: FontWeight.bold,
+                                                      letterSpacing: 0.5,
                                                     ),
                                                   ),
                                           ),
@@ -664,7 +657,7 @@ class _RegisterPageState extends State<RegisterPage>
                                 child: const Text(
                                   'Giriş Yap',
                                   style: TextStyle(
-                                    color: Color(0xFFE94560),
+                                    color: AppTheme.accent,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
                                   ),
@@ -694,7 +687,7 @@ class _RegisterPageState extends State<RegisterPage>
             Text(
               'Şifre Gücü',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
+                color: Colors.white.withValues(alpha: 0.5),
                 fontSize: 11,
               ),
             ),
@@ -787,12 +780,12 @@ class _RegisterPageState extends State<RegisterPage>
   }) {
     return InputDecoration(
       labelText: label,
-      labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
+      labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
       prefixIcon:
-          Icon(icon, color: Colors.white.withValues(alpha: 0.4), size: 20),
+          Icon(icon, color: Colors.white.withValues(alpha: 0.5), size: 20),
       suffixIcon: suffix,
       filled: true,
-      fillColor: Colors.white.withValues(alpha: 0.06),
+      fillColor: AppTheme.surfaceLight,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,
@@ -800,7 +793,7 @@ class _RegisterPageState extends State<RegisterPage>
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
         borderSide:
-            const BorderSide(color: Color(0xFFE94560), width: 1.5),
+            const BorderSide(color: AppTheme.accent, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -997,7 +990,7 @@ class _RegisterPageState extends State<RegisterPage>
                             ),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE94560),
+                            backgroundColor: AppTheme.accent,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),

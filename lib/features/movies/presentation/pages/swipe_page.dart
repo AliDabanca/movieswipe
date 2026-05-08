@@ -5,11 +5,13 @@ import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:provider/provider.dart';
 import 'package:movieswipe/core/providers/auth_provider.dart';
 import 'package:movieswipe/core/providers/liked_movies_provider.dart';
+import 'package:movieswipe/core/theme/app_theme.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_bloc.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_event.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_state.dart';
 import 'package:movieswipe/features/movies/presentation/widgets/movie_card.dart';
 import 'package:movieswipe/features/movies/presentation/pages/smart_discovery_page.dart';
+import 'package:movieswipe/core/presentation/widgets/logo_loader.dart';
 
 
 /// Swipe page - main movie swiping interface
@@ -87,13 +89,14 @@ class _SwipePageState extends State<SwipePage> {
           ),
           // Ghost action buttons
           Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildGhostButton(Colors.red.shade200),
-                _buildGhostButton(Colors.grey.shade300),
-                _buildGhostButton(Colors.green.shade200),
+                _buildGhostButton(AppTheme.passRed.withValues(alpha: 0.3)),
+                _buildGhostButton(Colors.grey.withValues(alpha: 0.2)),
+                _buildGhostButton(AppTheme.accent.withValues(alpha: 0.2)),
+                _buildGhostButton(AppTheme.likeGreen.withValues(alpha: 0.3)),
               ],
             ),
           ),
@@ -104,29 +107,43 @@ class _SwipePageState extends State<SwipePage> {
 
   Widget _buildGhostButton(Color color) {
     return Container(
-      width: 56,
-      height: 56,
+      width: 52,
+      height: 52,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: color.withValues(alpha: 0.3),
+        color: color,
       ),
     );
   }
 
   Widget _buildSwipeCards(BuildContext context, List movies) {
     if (movies.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.movie_outlined, size: 100, color: Colors.grey),
-            SizedBox(height: 16),
-            Text(
-              'No more movies!',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppTheme.accent.withValues(alpha: 0.1),
+              ),
+              child: const Icon(Icons.movie_outlined, size: 64,
+                  color: AppTheme.accent),
             ),
-            SizedBox(height: 8),
-            Text('Check back later for new movies'),
+            const SizedBox(height: 20),
+            const Text(
+              'Film kalmadı!',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Yeni filmler için daha sonra tekrar gel',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white.withValues(alpha: 0.5),
+              ),
+            ),
           ],
         ),
       );
@@ -138,7 +155,7 @@ class _SwipePageState extends State<SwipePage> {
           // Swipe cards
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
               child: CardSwiper(
                 key: ValueKey(_swiperGeneration),
                 controller: controller,
@@ -205,62 +222,57 @@ class _SwipePageState extends State<SwipePage> {
             ),
           ),
 
-          // Action buttons
+          // Premium Action Buttons
           Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 // Pass button
-                FloatingActionButton(
-                  heroTag: 'pass',
-                  onPressed: () {
-                    controller.swipe(CardSwiperDirection.left);
-                  },
-                  backgroundColor: Colors.red,
-                  child: const Icon(Icons.close, size: 32),
+                _ActionButton(
+                  onPressed: () => controller.swipe(CardSwiperDirection.left),
+                  gradient: AppTheme.passGradient,
+                  glowColor: AppTheme.passRed,
+                  icon: Icons.close_rounded,
+                  size: 60,
+                  iconSize: 30,
                 ),
 
                 // Undo button
-                FloatingActionButton.small(
-                  heroTag: 'undo',
-                  onPressed: () {
-                    controller.undo();
-                  },
-                  backgroundColor: Colors.grey,
-                  child: const Icon(Icons.refresh, size: 22),
+                _ActionButton(
+                  onPressed: () => controller.undo(),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF3A3F5C), Color(0xFF2A2E45)],
+                  ),
+                  glowColor: Colors.white24,
+                  icon: Icons.refresh_rounded,
+                  size: 46,
+                  iconSize: 22,
                 ),
 
                 // Smart AI Discovery button
-                FloatingActionButton.small(
-                  heroTag: 'smart_discovery',
+                _ActionButton(
                   onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const SmartDiscoveryPage()),
                     );
                   },
-                  backgroundColor: const Color(0xFF7C4DFF),
-                  child: ShaderMask(
-                    shaderCallback: (bounds) => const LinearGradient(
-                      colors: [Color(0xFFE040FB), Colors.white],
-                    ).createShader(bounds),
-                    child: const Icon(
-                      Icons.auto_awesome,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                  ),
+                  gradient: AppTheme.primaryGradient,
+                  glowColor: AppTheme.accent,
+                  icon: Icons.auto_awesome_rounded,
+                  size: 46,
+                  iconSize: 22,
                 ),
 
                 // Like button
-                FloatingActionButton(
-                  heroTag: 'like',
-                  onPressed: () {
-                    controller.swipe(CardSwiperDirection.right);
-                  },
-                  backgroundColor: Colors.green,
-                  child: const Icon(Icons.favorite, size: 32),
+                _ActionButton(
+                  onPressed: () => controller.swipe(CardSwiperDirection.right),
+                  gradient: AppTheme.likeGradient,
+                  glowColor: AppTheme.likeGreen,
+                  icon: Icons.favorite_rounded,
+                  size: 60,
+                  iconSize: 30,
                 ),
               ],
             ),
@@ -279,24 +291,35 @@ class _SwipePageState extends State<SwipePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.amber.withValues(alpha: 0.15),
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.warning.withValues(alpha: 0.2),
+                    AppTheme.warning.withValues(alpha: 0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                border: Border.all(
+                  color: AppTheme.warning.withValues(alpha: 0.3),
+                ),
               ),
               child: const Icon(
                 Icons.explore_off_rounded,
-                size: 80,
-                color: Colors.amber,
+                size: 64,
+                color: AppTheme.warning,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
             Text(
               message,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 20,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
               ),
             ),
             const SizedBox(height: 12),
@@ -305,18 +328,26 @@ class _SwipePageState extends State<SwipePage> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey.shade600,
+                color: Colors.white.withValues(alpha: 0.5),
               ),
             ),
             const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: () {
-                context.read<MoviesBloc>().add(LoadMoviesEvent());
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Tekrar Dene'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            Container(
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+              ),
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  context.read<MoviesBloc>().add(LoadMoviesEvent());
+                },
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Tekrar Dene'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                ),
               ),
             ),
           ],
@@ -330,17 +361,79 @@ class _SwipePageState extends State<SwipePage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline, size: 64, color: Colors.red),
-          const SizedBox(height: 16),
-          Text(message, textAlign: TextAlign.center),
-          const SizedBox(height: 16),
-          ElevatedButton(
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppTheme.passRed.withValues(alpha: 0.1),
+            ),
+            child: const Icon(Icons.error_outline_rounded,
+                size: 56, color: AppTheme.passRed),
+          ),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 15,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
             onPressed: () {
               context.read<MoviesBloc>().add(LoadMoviesEvent());
             },
-            child: const Text('Retry'),
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Tekrar Dene'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Premium action button with gradient background and glow effect
+class _ActionButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  final Gradient gradient;
+  final Color glowColor;
+  final IconData icon;
+  final double size;
+  final double iconSize;
+
+  const _ActionButton({
+    required this.onPressed,
+    required this.gradient,
+    required this.glowColor,
+    required this.icon,
+    required this.size,
+    required this.iconSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: gradient,
+          boxShadow: [
+            BoxShadow(
+              color: glowColor.withValues(alpha: 0.35),
+              blurRadius: 20,
+              spreadRadius: 0,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Icon(icon, size: iconSize, color: Colors.white),
       ),
     );
   }
@@ -380,104 +473,111 @@ class _ShimmerCardState extends State<_ShimmerCard>
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {
-        return Card(
-          margin: EdgeInsets.zero,
-          elevation: 8,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+        return Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+            color: AppTheme.surface,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              // Skeleton poster
-              Expanded(
-                flex: 3,
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment(_animation.value - 1, 0),
-                        end: Alignment(_animation.value, 0),
-                        colors: const [
-                          Color(0xFFE0E0E0),
-                          Color(0xFFF5F5F5),
-                          Color(0xFFE0E0E0),
-                        ],
-                      ),
+              ClipRRect(
+            borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Shimmer effect
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment(_animation.value - 1, 0),
+                      end: Alignment(_animation.value, 0),
+                      colors: [
+                        AppTheme.surface,
+                        AppTheme.surfaceLight,
+                        AppTheme.surface,
+                      ],
                     ),
-                    child: Center(
-                      child: Icon(
-                        Icons.movie_outlined,
-                        size: 80,
-                        color: Colors.grey.shade400,
+                  ),
+                ),
+                // Center icon
+                Center(
+                  child: Icon(
+                    Icons.movie_outlined,
+                    size: 64,
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+                // Bottom shimmer info
+                Positioned(
+                  left: 20,
+                  right: 20,
+                  bottom: 24,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 180,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          gradient: LinearGradient(
+                            begin: Alignment(_animation.value - 1, 0),
+                            end: Alignment(_animation.value, 0),
+                            colors: [
+                              Colors.white.withValues(alpha: 0.05),
+                              Colors.white.withValues(alpha: 0.1),
+                              Colors.white.withValues(alpha: 0.05),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: 80,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          gradient: LinearGradient(
+                            begin: Alignment(_animation.value - 1, 0),
+                            end: Alignment(_animation.value, 0),
+                            colors: [
+                              Colors.white.withValues(alpha: 0.03),
+                              Colors.white.withValues(alpha: 0.08),
+                              Colors.white.withValues(alpha: 0.03),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Loading text
+                Positioned(
+                  bottom: 80,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Text(
+                      'Senin için film arıyoruz...',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
                   ),
                 ),
-              ),
-
-              // Skeleton info
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Title skeleton
-                    Container(
-                      width: 200,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(6),
-                        gradient: LinearGradient(
-                          begin: Alignment(_animation.value - 1, 0),
-                          end: Alignment(_animation.value, 0),
-                          colors: const [
-                            Color(0xFFE0E0E0),
-                            Color(0xFFF5F5F5),
-                            Color(0xFFE0E0E0),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Genre chip skeleton
-                    Container(
-                      width: 80,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        gradient: LinearGradient(
-                          begin: Alignment(_animation.value - 1, 0),
-                          end: Alignment(_animation.value, 0),
-                          colors: const [
-                            Color(0xFFE0E0E0),
-                            Color(0xFFF5F5F5),
-                            Color(0xFFE0E0E0),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Loading text
-                    Center(
-                      child: Text(
-                        'Finding movies for you...',
-                        style: TextStyle(
-                          color: Colors.grey.shade500,
-                          fontSize: 14,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        );
+          // Center LogoLoader
+          const Center(
+            child: LogoLoader(size: 80),
+          ),
+        ],
+      ),
+    );
       },
     );
   }

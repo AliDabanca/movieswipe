@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:movieswipe/core/presentation/widgets/logo_loader.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -94,7 +95,7 @@ class _LikedMoviesTab extends StatelessWidget {
     return Consumer<LikedMoviesProvider>(
       builder: (context, provider, _) {
         if (provider.isLoading && !provider.isLoaded) {
-          return const Center(child: CircularProgressIndicator(color: Colors.white));
+          return const Center(child: LogoLoader(size: 60));
         }
         if (provider.moviesByGenre.isEmpty) {
           return Center(
@@ -124,7 +125,7 @@ class _CollectionsTab extends StatelessWidget {
     return Consumer<CollectionsProvider>(
       builder: (context, provider, _) {
         if (provider.isLoading && !provider.isLoaded) {
-          return const Center(child: CircularProgressIndicator(color: Colors.white));
+          return const Center(child: LogoLoader(size: 60));
         }
         return CustomScrollView(
           slivers: [

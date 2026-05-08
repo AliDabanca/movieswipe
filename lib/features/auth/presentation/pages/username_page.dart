@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:movieswipe/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:movieswipe/core/providers/auth_provider.dart';
 
@@ -125,7 +126,7 @@ class _UsernamePageState extends State<UsernamePage>
                 height: 200,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFFE94560).withValues(alpha: 0.12),
+                  color: AppTheme.accent.withValues(alpha: 0.12),
                 ),
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
@@ -181,7 +182,7 @@ class _UsernamePageState extends State<UsernamePage>
                                           const Color(0xFF2ECC71),
                                         ]
                                       : [
-                                          const Color(0xFFE94560),
+                                          AppTheme.accent,
                                           const Color(0xFFEC4899),
                                         ],
                                 ),
@@ -189,7 +190,7 @@ class _UsernamePageState extends State<UsernamePage>
                                   BoxShadow(
                                     color: (_isAvailable == true
                                             ? const Color(0xFF27AE60)
-                                            : const Color(0xFFE94560))
+                                            : AppTheme.accent)
                                         .withValues(alpha: 0.3),
                                     blurRadius: 25,
                                     spreadRadius: 3,
@@ -267,12 +268,12 @@ class _UsernamePageState extends State<UsernamePage>
                                     margin:
                                         const EdgeInsets.only(bottom: 20),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFE94560)
+                                      color: AppTheme.accent
                                           .withValues(alpha: 0.12),
                                       borderRadius:
                                           BorderRadius.circular(16),
                                       border: Border.all(
-                                        color: const Color(0xFFE94560)
+                                        color: AppTheme.accent
                                             .withValues(alpha: 0.3),
                                       ),
                                     ),
@@ -283,7 +284,7 @@ class _UsernamePageState extends State<UsernamePage>
                                               const EdgeInsets.all(6),
                                           decoration: BoxDecoration(
                                             color:
-                                                const Color(0xFFE94560)
+                                                AppTheme.accent
                                                     .withValues(
                                                         alpha: 0.2),
                                             shape: BoxShape.circle,
@@ -292,7 +293,7 @@ class _UsernamePageState extends State<UsernamePage>
                                               Icons
                                                   .error_outline_rounded,
                                               color:
-                                                  Color(0xFFE94560),
+                                                  AppTheme.accent,
                                               size: 18),
                                         ),
                                         const SizedBox(width: 12),
@@ -301,7 +302,7 @@ class _UsernamePageState extends State<UsernamePage>
                                             auth.errorMessage!,
                                             style: const TextStyle(
                                               color:
-                                                  Color(0xFFE94560),
+                                                  AppTheme.accent,
                                               fontSize: 13,
                                               fontWeight:
                                                   FontWeight.w500,
@@ -536,89 +537,73 @@ class _UsernamePageState extends State<UsernamePage>
                                       const SizedBox(height: 28),
 
                                       // Submit button
-                                      SizedBox(
+                                      AnimatedContainer(
+                                        duration: const Duration(milliseconds: 300),
                                         width: double.infinity,
                                         height: 56,
-                                        child: AnimatedContainer(
-                                          duration: const Duration(
-                                              milliseconds: 300),
-                                          child: ElevatedButton(
-                                            onPressed: auth.isLoading ||
-                                                    _isAvailable !=
-                                                        true
-                                                ? null
-                                                : _handleSubmit,
-                                            style: ElevatedButton
-                                                .styleFrom(
-                                              backgroundColor:
-                                                  const Color(
-                                                      0xFFE94560),
-                                              foregroundColor:
-                                                  Colors.white,
-                                              disabledBackgroundColor:
-                                                  const Color(
-                                                          0xFFE94560)
-                                                      .withValues(
-                                                          alpha:
-                                                              0.25),
-                                              shape:
-                                                  RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius
-                                                        .circular(
-                                                            16),
-                                              ),
-                                              elevation: 0,
-                                            ),
-                                            child: auth.isLoading
-                                                ? const SizedBox(
-                                                    width: 24,
-                                                    height: 24,
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                      color: Colors
-                                                          .white,
-                                                      strokeWidth:
-                                                          2.5,
-                                                    ),
-                                                  )
-                                                : Row(
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    children: [
-                                                      const Text(
-                                                        'Devam Et',
-                                                        style:
-                                                            TextStyle(
-                                                          fontSize:
-                                                              17,
-                                                          fontWeight:
-                                                              FontWeight
-                                                                  .bold,
-                                                          letterSpacing:
-                                                              0.5,
-                                                        ),
-                                                      ),
-                                                      const SizedBox(
-                                                          width: 8),
-                                                      Icon(
-                                                        Icons
-                                                            .arrow_forward_rounded,
-                                                        size: 20,
-                                                        color: _isAvailable ==
-                                                                true
-                                                            ? Colors
-                                                                .white
-                                                            : Colors
-                                                                .white
-                                                                .withValues(
-                                                                    alpha:
-                                                                        0.3),
-                                                      ),
-                                                    ],
+                                        decoration: BoxDecoration(
+                                          gradient: _isAvailable == true
+                                              ? AppTheme.primaryGradient
+                                              : null,
+                                          color: _isAvailable != true
+                                              ? Colors.white.withValues(alpha: 0.1)
+                                              : null,
+                                          borderRadius: BorderRadius.circular(16),
+                                          boxShadow: _isAvailable == true
+                                              ? [
+                                                  BoxShadow(
+                                                    color: AppTheme.accent.withValues(alpha: 0.3),
+                                                    blurRadius: 12,
+                                                    offset: const Offset(0, 4),
                                                   ),
+                                                ]
+                                              : [],
+                                        ),
+                                        child: ElevatedButton(
+                                          onPressed: auth.isLoading || _isAvailable != true
+                                              ? null
+                                              : _handleSubmit,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.transparent,
+                                            shadowColor: Colors.transparent,
+                                            foregroundColor: Colors.white,
+                                            disabledForegroundColor: Colors.white.withValues(alpha: 0.3),
+                                            disabledBackgroundColor: Colors.transparent,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(16),
+                                            ),
+                                            elevation: 0,
                                           ),
+                                          child: auth.isLoading
+                                              ? const SizedBox(
+                                                  width: 24,
+                                                  height: 24,
+                                                  child: CircularProgressIndicator(
+                                                    color: Colors.white,
+                                                    strokeWidth: 2.5,
+                                                  ),
+                                                )
+                                              : Row(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    const Text(
+                                                      'Devam Et',
+                                                      style: TextStyle(
+                                                        fontSize: 17,
+                                                        fontWeight: FontWeight.bold,
+                                                        letterSpacing: 0.5,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Icon(
+                                                      Icons.arrow_forward_rounded,
+                                                      size: 20,
+                                                      color: _isAvailable == true
+                                                          ? Colors.white
+                                                          : Colors.white.withValues(alpha: 0.3),
+                                                    ),
+                                                  ],
+                                                ),
                                         ),
                                       ),
                                     ],

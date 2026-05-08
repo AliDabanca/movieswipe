@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:movieswipe/core/theme/app_theme.dart';
 
 /// Circular gauge showing compatibility percentage with glassmorphism style
 class CompatibilityGauge extends StatelessWidget {
@@ -32,11 +33,11 @@ class CompatibilityGauge extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE94560).withValues(alpha: 0.15),
+                      color: AppTheme.accent.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.favorite_rounded,
-                        color: Color(0xFFE94560), size: 18),
+                        color: AppTheme.accent, size: 18),
                   ),
                   const SizedBox(width: 10),
                   const Text(
@@ -120,6 +121,6 @@ class CompatibilityGauge extends StatelessWidget {
   Color _getScoreColor(int score) {
     if (score >= 70) return const Color(0xFF27AE60);
     if (score >= 40) return const Color(0xFFFFD93D);
-    return const Color(0xFFE94560);
+    return AppTheme.accent;
   }
 }

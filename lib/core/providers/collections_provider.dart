@@ -327,6 +327,7 @@ class CollectionsProvider extends ChangeNotifier {
   void clear() {
     _collections = [];
     _isLoaded = false;
+    _isLoading = false;
     notifyListeners();
   }
 }

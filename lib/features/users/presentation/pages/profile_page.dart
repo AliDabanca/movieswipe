@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:movieswipe/core/providers/auth_provider.dart';
 import 'package:movieswipe/core/providers/liked_movies_provider.dart';
+import 'package:movieswipe/core/providers/collections_provider.dart';
+import 'package:movieswipe/core/theme/app_theme.dart';
 import 'package:movieswipe/features/users/presentation/widgets/avatar_selection_sheet.dart';
 import 'package:movieswipe/features/users/presentation/widgets/genre_dna_chart.dart';
 import 'package:movieswipe/features/users/presentation/widgets/current_mood_aura.dart';
@@ -12,6 +14,7 @@ import 'package:movieswipe/features/social/presentation/bloc/social_bloc.dart';
 import 'package:movieswipe/features/social/presentation/bloc/social_event.dart';
 import 'package:movieswipe/features/social/presentation/bloc/social_state.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:movieswipe/core/presentation/widgets/logo_loader.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -44,7 +47,10 @@ class _ProfilePageState extends State<ProfilePage> {
     final likedProvider = Provider.of<LikedMoviesProvider>(context);
 
     if (likedProvider.isLoading && !likedProvider.isLoaded) {
-      return const Center(child: CircularProgressIndicator());
+      return const Scaffold(
+        backgroundColor: AppTheme.midnight,
+        body: Center(child: LogoLoader(size: 80)),
+      );
     }
 
     return BlocListener<SocialBloc, SocialState>(
@@ -247,14 +253,14 @@ class _ProfilePageState extends State<ProfilePage> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFE94560)
+                                    color: AppTheme.accent
                                         .withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Text(
                                     '${liked.achievements.where((a) => a['isUnlocked'] == true).length}/${liked.achievements.length}',
                                     style: const TextStyle(
-                                      color: Color(0xFFE94560),
+                                      color: AppTheme.accent,
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -302,15 +308,17 @@ class _ProfilePageState extends State<ProfilePage> {
                     child: OutlinedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
+                        context.read<LikedMoviesProvider>().clear();
+                        context.read<CollectionsProvider>().clear();
                         auth.signOut();
                       },
                       icon: const Icon(Icons.logout_rounded, size: 18),
                       label: const Text('Çıkış Yap'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFE94560),
+                        foregroundColor: AppTheme.accent,
                         side: BorderSide(
                           color:
-                              const Color(0xFFE94560).withValues(alpha: 0.4),
+                              AppTheme.accent.withValues(alpha: 0.4),
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
@@ -342,7 +350,7 @@ class _ProfilePageState extends State<ProfilePage> {
           icon: Icons.favorite_rounded,
           label: 'Beğeni Oranı',
           value: '${(liked.likeRatio * 100).toInt()}%',
-          color: const Color(0xFFE94560),
+          color: AppTheme.accent,
         ),
         const SizedBox(height: 8),
         _buildDrawerStatTile(
@@ -448,11 +456,11 @@ class _ProfilePageState extends State<ProfilePage> {
                   icon: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE94560).withValues(alpha: 0.15),
+                      color: AppTheme.accent.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(Icons.notifications_active_rounded,
-                        color: Color(0xFFE94560), size: 20),
+                        color: AppTheme.accent, size: 20),
                   ),
                 ),
               IconButton(
@@ -493,7 +501,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: const Color(0xFFE94560).withValues(alpha: 0.5),
+                          color: AppTheme.accent.withValues(alpha: 0.5),
                           width: 2,
                         ),
                         color: Colors.white.withValues(alpha: 0.05),
@@ -518,7 +526,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: const BoxDecoration(
-                          color: Color(0xFFE94560),
+                          color: AppTheme.accent,
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.edit,
@@ -576,13 +584,13 @@ class _ProfilePageState extends State<ProfilePage> {
                           }
                           return Row(
                             children: [
-                              Icon(Icons.group_rounded, size: 14, color: const Color(0xFFE94560).withValues(alpha: 0.7)),
+                              Icon(Icons.group_rounded, size: 14, color: AppTheme.accent.withValues(alpha: 0.7)),
                               const SizedBox(width: 4),
                               Text(
                                 '$count Arkadaş',
                                 style: const TextStyle(
                                   fontSize: 13,
-                                  color: Color(0xFFE94560),
+                                  color: AppTheme.accent,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -593,12 +601,12 @@ class _ProfilePageState extends State<ProfilePage> {
                                   width: 6,
                                   height: 6,
                                   decoration: const BoxDecoration(
-                                    color: Color(0xFFE94560),
+                                    color: AppTheme.accent,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
                               const SizedBox(width: 4),
-                              Icon(Icons.chevron_right_rounded, size: 14, color: const Color(0xFFE94560).withValues(alpha: 0.5)),
+                              Icon(Icons.chevron_right_rounded, size: 14, color: AppTheme.accent.withValues(alpha: 0.5)),
                             ],
                           );
                         },
@@ -627,21 +635,21 @@ class _ProfilePageState extends State<ProfilePage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFE94560).withValues(alpha: 0.15),
+              color: AppTheme.accent.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                  color: const Color(0xFFE94560).withValues(alpha: 0.3)),
+                  color: AppTheme.accent.withValues(alpha: 0.3)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.auto_awesome,
-                    size: 14, color: Color(0xFFE94560)),
+                    size: 14, color: AppTheme.accent),
                 const SizedBox(width: 8),
                 Text(
                   liked.movieDnaTitle,
                   style: const TextStyle(
-                    color: Color(0xFFE94560),
+                    color: AppTheme.accent,
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
                   ),
@@ -793,8 +801,8 @@ class _ProfilePageState extends State<ProfilePage> {
               shape: BoxShape.circle,
               gradient: isUnlocked ? LinearGradient(
                 colors: [
-                  const Color(0xFFE94560).withValues(alpha: 0.2),
-                  const Color(0xFFE94560).withValues(alpha: 0.05),
+                  AppTheme.accent.withValues(alpha: 0.2),
+                  AppTheme.accent.withValues(alpha: 0.05),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -804,14 +812,14 @@ class _ProfilePageState extends State<ProfilePage> {
                   : Colors.white.withValues(alpha: 0.04),
               border: Border.all(
                 color: isUnlocked
-                    ? const Color(0xFFE94560).withValues(alpha: 0.6)
+                    ? AppTheme.accent.withValues(alpha: 0.6)
                     : Colors.white.withValues(alpha: 0.1),
                 width: 2,
               ),
               boxShadow: isUnlocked
                   ? [
                       BoxShadow(
-                        color: const Color(0xFFE94560).withValues(alpha: 0.3),
+                        color: AppTheme.accent.withValues(alpha: 0.3),
                         blurRadius: 15,
                         spreadRadius: 2,
                       ),
@@ -878,11 +886,11 @@ class _ProfilePageState extends State<ProfilePage> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: isUnlocked
-                      ? const Color(0xFFE94560).withValues(alpha: 0.15)
+                      ? AppTheme.accent.withValues(alpha: 0.15)
                       : Colors.white.withValues(alpha: 0.05),
                   border: Border.all(
                     color: isUnlocked
-                        ? const Color(0xFFE94560).withValues(alpha: 0.5)
+                        ? AppTheme.accent.withValues(alpha: 0.5)
                         : Colors.white12,
                     width: 2,
                   ),
@@ -990,7 +998,7 @@ class _ProfilePageState extends State<ProfilePage> {
               enabledBorder: const UnderlineInputBorder(
                   borderSide: BorderSide(color: Colors.white24)),
               focusedBorder: const UnderlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFFE94560))),
+                  borderSide: BorderSide(color: AppTheme.accent)),
             ),
           ),
           actions: [
@@ -1007,7 +1015,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 if (context.mounted) Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE94560),
+                backgroundColor: AppTheme.accent,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),

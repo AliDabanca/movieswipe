@@ -1,8 +1,10 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 import 'package:movieswipe/core/providers/auth_provider.dart';
 import 'package:movieswipe/core/providers/liked_movies_provider.dart';
+import 'package:movieswipe/core/theme/app_theme.dart';
 import 'package:movieswipe/features/movies/presentation/pages/swipe_page.dart';
 import 'package:movieswipe/features/movies/presentation/pages/my_list_page.dart';
 import 'package:movieswipe/features/users/presentation/pages/profile_page.dart';
@@ -59,30 +61,66 @@ class _MainNavigationState extends State<MainNavigation> {
             index: _currentIndex,
             children: _pages,
           ),
-          bottomNavigationBar: NavigationBar(
+          bottomNavigationBar: _buildGlassNavBar(),
+        ),
+      ),
+    );
+  }
+
+  /// Premium frosted-glass bottom navigation bar
+  Widget _buildGlassNavBar() {
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.midnight.withValues(alpha: 0.75),
+            border: Border(
+              top: BorderSide(
+                color: Colors.white.withValues(alpha: 0.08),
+                width: 0.5,
+              ),
+            ),
+          ),
+          child: NavigationBar(
             backgroundColor: Colors.transparent,
-            indicatorColor: Colors.white.withValues(alpha: 0.1),
+            indicatorColor: AppTheme.accent.withValues(alpha: 0.12),
             selectedIndex: _currentIndex,
             onDestinationSelected: (index) {
               setState(() {
                 _currentIndex = index;
               });
             },
-            destinations: const [
+            destinations: [
               NavigationDestination(
-                icon: Icon(Icons.swipe),
-                selectedIcon: Icon(Icons.swipe),
-                label: 'Swipe',
+                icon: Icon(Icons.swipe_rounded,
+                    color: Colors.white.withValues(alpha: 0.45)),
+                selectedIcon: ShaderMask(
+                  shaderCallback: (bounds) =>
+                      AppTheme.primaryGradient.createShader(bounds),
+                  child: const Icon(Icons.swipe_rounded, color: Colors.white),
+                ),
+                label: 'Keşfet',
               ),
               NavigationDestination(
-                icon: Icon(Icons.favorite_outline),
-                selectedIcon: Icon(Icons.favorite),
-                label: 'My List',
+                icon: Icon(Icons.favorite_outline_rounded,
+                    color: Colors.white.withValues(alpha: 0.45)),
+                selectedIcon: ShaderMask(
+                  shaderCallback: (bounds) =>
+                      AppTheme.primaryGradient.createShader(bounds),
+                  child: const Icon(Icons.favorite_rounded, color: Colors.white),
+                ),
+                label: 'Listem',
               ),
               NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person),
-                label: 'Profile',
+                icon: Icon(Icons.person_outline_rounded,
+                    color: Colors.white.withValues(alpha: 0.45)),
+                selectedIcon: ShaderMask(
+                  shaderCallback: (bounds) =>
+                      AppTheme.primaryGradient.createShader(bounds),
+                  child: const Icon(Icons.person_rounded, color: Colors.white),
+                ),
+                label: 'Profil',
               ),
             ],
           ),
@@ -91,4 +129,3 @@ class _MainNavigationState extends State<MainNavigation> {
     );
   }
 }
-

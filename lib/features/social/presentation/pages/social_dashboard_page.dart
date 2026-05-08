@@ -1,5 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:movieswipe/core/presentation/widgets/logo_loader.dart';
+import 'package:movieswipe/core/theme/app_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/social_bloc.dart';
 import '../bloc/social_event.dart';
@@ -88,7 +90,7 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(state.message),
-                      backgroundColor: isInfo ? Colors.blue : const Color(0xFFE94560),
+                      backgroundColor: isInfo ? Colors.blue : AppTheme.accent,
                       behavior: SnackBarBehavior.fixed,
                     ),
                   );
@@ -143,11 +145,11 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
                 icon: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE94560).withValues(alpha: 0.15),
+                    color: AppTheme.accent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.person_add_rounded,
-                      color: Color(0xFFE94560), size: 20),
+                      color: AppTheme.accent, size: 20),
                 ),
               ),
               const SizedBox(width: 4),
@@ -191,7 +193,7 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
                 }
                 return TabBar(
                   controller: _tabController,
-                  indicatorColor: const Color(0xFFE94560),
+                  indicatorColor: AppTheme.accent,
                   indicatorWeight: 3,
                   labelColor: Colors.white,
                   unselectedLabelColor: Colors.white54,
@@ -209,7 +211,7 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
                             Container(
                               padding: const EdgeInsets.all(4),
                               decoration: const BoxDecoration(
-                                color: Color(0xFFE94560),
+                                color: AppTheme.accent,
                                 shape: BoxShape.circle,
                               ),
                               child: Text(
@@ -248,7 +250,7 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
           if (state is SocialError) {
              return Center(child: Text(state.message, style: const TextStyle(color: Colors.white)));
           }
-          return const Center(child: CircularProgressIndicator(color: Color(0xFFE94560)));
+          return const Center(child: LogoLoader(size: 60));
         }
 
         return RefreshIndicator(
@@ -256,7 +258,7 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
             context.read<SocialBloc>().add(LoadFriendsEvent());
             await Future.delayed(const Duration(seconds: 1));
           },
-          color: const Color(0xFFE94560),
+          color: AppTheme.accent,
           backgroundColor: const Color(0xFF1a1a2e),
           child: friends.isEmpty
               ? Stack(
@@ -292,7 +294,7 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
           if (state is SocialError) {
              return Center(child: Text(state.message, style: const TextStyle(color: Colors.white)));
           }
-          return const Center(child: CircularProgressIndicator(color: Color(0xFFE94560)));
+          return const Center(child: LogoLoader(size: 60));
         }
 
         return RefreshIndicator(
@@ -300,7 +302,7 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
             context.read<SocialBloc>().add(LoadIncomingRequestsEvent());
             await Future.delayed(const Duration(seconds: 1));
           },
-          color: const Color(0xFFE94560),
+          color: AppTheme.accent,
           backgroundColor: const Color(0xFF1a1a2e),
           child: requests.isEmpty
               ? Stack(
@@ -419,7 +421,7 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
                   const SizedBox(width: 8),
                   _buildActionButton(
                     icon: Icons.close_rounded,
-                    color: const Color(0xFFE94560),
+                    color: AppTheme.accent,
                     onTap: () => context
                         .read<SocialBloc>()
                         .add(RejectRequestEvent(request.id)),
@@ -440,7 +442,7 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: const Color(0xFFE94560).withValues(alpha: 0.3),
+          color: AppTheme.accent.withValues(alpha: 0.3),
           width: 2,
         ),
         color: Colors.white.withValues(alpha: 0.05),
@@ -553,7 +555,7 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE94560),
+                backgroundColor: AppTheme.accent,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16)),
               ),
@@ -585,7 +587,7 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
           (current is SocialLoading && _currentTab == 2),
       builder: (context, state) {
         if (state is SocialLoading && _cachedNotifications == null) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: LogoLoader(size: 60));
         }
 
         List<NotificationEntity> notifications = _cachedNotifications ?? [];
@@ -624,7 +626,7 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
               title =
                   '${notif.actorDisplayName ?? notif.actorUsername} sana arkadaşlık isteği gönderdi.';
               icon = Icons.person_add_rounded;
-              iconColor = const Color(0xFFE94560);
+              iconColor = AppTheme.accent;
             } else if (notif.type == 'request_accepted') {
               title =
                   '${notif.actorDisplayName ?? notif.actorUsername} arkadaşlık isteğini kabul etti!';
@@ -642,7 +644,7 @@ class _SocialDashboardPageState extends State<SocialDashboardPage>
                 border: Border.all(
                   color: notif.isRead
                       ? Colors.transparent
-                      : const Color(0xFFE94560).withValues(alpha: 0.3),
+                      : AppTheme.accent.withValues(alpha: 0.3),
                 ),
               ),
               child: ListTile(
@@ -771,7 +773,7 @@ class _SearchSheetState extends State<_SearchSheet> {
                     }
 
                     if (state is SocialLoading) {
-                      return const Center(child: CircularProgressIndicator());
+                      return const Center(child: LogoLoader(size: 60));
                     }
                     if (state is UserSearchResults) {
                       if (state.results.isEmpty) {
@@ -816,7 +818,7 @@ class _SearchSheetState extends State<_SearchSheet> {
           : user.isFriend
               ? const Icon(Icons.check_circle, color: Colors.green)
               : IconButton(
-                  icon: const Icon(Icons.person_add, color: Color(0xFFE94560)),
+                  icon: const Icon(Icons.person_add, color: AppTheme.accent),
                   onPressed: () {
                     context.read<SocialBloc>().add(SendFriendRequestEvent(user.username));
                     Navigator.pop(context);

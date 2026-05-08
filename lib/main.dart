@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:movieswipe/core/config/env_config.dart';
 import 'package:movieswipe/core/di/injection_container.dart' as di;
+import 'package:movieswipe/core/theme/app_theme.dart';
 import 'package:movieswipe/core/providers/auth_provider.dart';
 import 'package:movieswipe/core/providers/liked_movies_provider.dart';
 import 'package:movieswipe/core/providers/collections_provider.dart';
@@ -10,6 +11,7 @@ import 'package:movieswipe/features/auth/presentation/pages/login_page.dart';
 import 'package:movieswipe/features/auth/presentation/pages/username_page.dart';
 import 'package:movieswipe/features/onboarding/presentation/pages/onboarding_page.dart';
 import 'package:movieswipe/features/navigation/main_navigation.dart';
+import 'package:movieswipe/core/presentation/widgets/logo_loader.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,21 +46,18 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CollectionsProvider()),
       ],
       child: MaterialApp(
-        title: 'MovieSwipe',
+        title: 'CineSwipe',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFFe94560),
-            brightness: Brightness.dark,
-          ),
-          useMaterial3: true,
-        ),
+        theme: AppTheme.darkTheme,
         home: Consumer<AuthProvider>(
           builder: (context, auth, _) {
             // Still loading auth state
             if (auth.isLoading || (auth.isAuthenticated && !auth.profileChecked)) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
+              return Scaffold(
+                backgroundColor: AppTheme.midnight,
+                body: const Center(
+                  child: LogoLoader(size: 120),
+                ),
               );
             }
 
