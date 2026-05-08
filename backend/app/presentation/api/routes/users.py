@@ -122,6 +122,23 @@ def get_my_mood_history(user_id: str = Depends(get_current_user_id)):
             detail="Failed to fetch mood history",
         )
 
+
+@router.get("/me/daily-activity")
+def get_my_daily_activity(user_id: str = Depends(get_current_user_id)):
+    """
+    Get the user's swipe activity for the last 7 days.
+    Returns total swipes, likes, and passes per day.
+    """
+    try:
+        activity = recommendation_service.get_daily_activity(user_id)
+        return {"daily_activity": activity}
+    except Exception as e:
+        logger.error(f"Failed to fetch daily activity for user {user_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch daily activity",
+        )
+
 @router.post("/me/update-taste-vector")
 def update_taste_vector(user_id: str = Depends(get_current_user_id)):
     """

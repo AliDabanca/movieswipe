@@ -9,6 +9,7 @@ import 'package:movieswipe/features/users/presentation/widgets/avatar_selection_
 import 'package:movieswipe/features/users/presentation/widgets/genre_dna_chart.dart';
 import 'package:movieswipe/features/users/presentation/widgets/current_mood_aura.dart';
 import 'package:movieswipe/features/users/presentation/widgets/cover_selection_sheet.dart';
+import 'package:movieswipe/features/users/presentation/widgets/daily_activity_chart.dart';
 import 'package:movieswipe/features/social/presentation/pages/social_dashboard_page.dart';
 import 'package:movieswipe/features/social/presentation/bloc/social_bloc.dart';
 import 'package:movieswipe/features/social/presentation/bloc/social_event.dart';
@@ -101,6 +102,14 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: _buildDnaSection(likedProvider),
                     ),
                   ),
+
+                // Haftalık Aktivite Grafiği
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 20.0),
+                    child: DailyActivityChart(),
+                  ),
+                ),
 
                 const SliverToBoxAdapter(child: SizedBox(height: 100)),
               ],
