@@ -80,33 +80,34 @@ class _ProfilePageState extends State<ProfilePage> {
                 // Profile Header Card
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.all(20.0),
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
                     child: _buildGlassHeader(context, auth, likedProvider),
                   ),
                 ),
 
-                // Mood Aura Section
-                if (likedProvider.currentMood != null)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                      child: _buildMoodSection(likedProvider),
-                    ),
+                // AI Insights — Character & Mood Cards
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                    child: _buildAiInsightCards(likedProvider),
                   ),
+                ),
 
                 // Movie DNA Section
                 if (likedProvider.moviesByGenre.isNotEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                       child: _buildDnaSection(likedProvider),
                     ),
                   ),
 
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
                 // Haftalık Aktivite Grafiği
                 const SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.only(top: 20.0),
+                    padding: EdgeInsets.symmetric(horizontal: 20.0),
                     child: DailyActivityChart(),
                   ),
                 ),
@@ -581,7 +582,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         color: Colors.white.withValues(alpha: 0.5),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     GestureDetector(
                       onTap: () => _showSocialDashboard(context),
                       child: BlocBuilder<SocialBloc, SocialState>(
@@ -604,7 +605,6 @@ class _ProfilePageState extends State<ProfilePage> {
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              // Notification dot for pending requests or unread notifications
                               if (_pendingRequestsCount > 0 || _hasUnreadNotifications)
                                 Container(
                                   width: 6,
@@ -639,31 +639,163 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          // DNA Title Badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppTheme.accent.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                  color: AppTheme.accent.withValues(alpha: 0.3)),
-            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiInsightCards(LikedMoviesProvider liked) {
+    return Row(
+      children: [
+        // Character Card
+        Expanded(
+          child: _GlassCard(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.auto_awesome,
-                    size: 14, color: AppTheme.accent),
-                const SizedBox(width: 8),
-                Text(
-                  liked.movieDnaTitle,
-                  style: const TextStyle(
-                    color: AppTheme.accent,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                // Header icon
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.accent.withValues(alpha: 0.3),
+                        const Color(0xFF7C4DFF).withValues(alpha: 0.2),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [AppTheme.accent, Color(0xFF7C4DFF)],
+                    ).createShader(bounds),
+                    child: const Icon(Icons.auto_awesome_rounded,
+                        color: Colors.white, size: 18),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Karakterin',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withValues(alpha: 0.45),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        liked.movieDnaTitle,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
               ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        // Mood Card
+        Expanded(
+          child: _GlassCard(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                // Header icon
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF06D6A0).withValues(alpha: 0.3),
+                        const Color(0xFF118AB2).withValues(alpha: 0.2),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    liked.currentEmoji ?? '🎭',
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Anlık Modun',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withValues(alpha: 0.45),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        liked.currentMood ?? 'Keşfediliyor...',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTraitBadge({
+    required IconData icon,
+    required String text,
+    required Color color,
+    bool isMood = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.25),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
             ),
           ),
         ],

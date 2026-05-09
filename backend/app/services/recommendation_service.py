@@ -41,11 +41,14 @@ class UserProfile:
     BAYESIAN_PRIOR = 2   # Virtual samples added per genre (smoothing)
     CONFIDENCE_THRESHOLD = 20  # Swipes needed for full confidence
     
-    def __init__(self, genre_stats: List[Dict]):
+    def __init__(self, genre_stats: List[Dict], liked_movies: List[Dict] = None):
         self.genre_stats = genre_stats
         self.genre_scores = self._compute_scores()
         self.total_swipes = sum(g.get("total_count", 0) for g in genre_stats)
         self.seen_genres = set(self.genre_scores.keys())
+        self.era_preference = self._compute_era_preference(liked_movies or [])
+        self.avg_user_rating = self._compute_avg_rating(liked_movies or [])
+        self.high_rated_genres = self._compute_high_rated_genres(liked_movies or [])
     
     @property
     def is_cold_start(self) -> bool:
@@ -129,9 +132,67 @@ class UserProfile:
             for genre, score in normalized.items()
         }
     
+    def _compute_era_preference(self, liked_movies: List[Dict]) -> str:
+        """Determine if the user prefers classic, modern, or mixed era movies.
+        
+        Returns: 'classic' | 'modern' | 'mixed'
+        """
+        if not liked_movies:
+            return 'mixed'
+        
+        years = []
+        for m in liked_movies:
+            release = m.get('release_date', '')
+            if release and len(release) >= 4:
+                try:
+                    years.append(int(release[:4]))
+                except ValueError:
+                    continue
+        
+        if not years:
+            return 'mixed'
+        
+        avg_year = sum(years) / len(years)
+        if avg_year < 2000:
+            return 'classic'
+        elif avg_year > 2015:
+            return 'modern'
+        return 'mixed'
+    
+    def _compute_avg_rating(self, liked_movies: List[Dict]) -> float:
+        """Average user rating across all rated movies."""
+        ratings = []
+        for m in liked_movies:
+            r = m.get('rating')
+            if r is not None and r > 0:
+                ratings.append(r)
+        return sum(ratings) / len(ratings) if ratings else 0.0
+    
+    def _compute_high_rated_genres(self, liked_movies: List[Dict]) -> Dict[str, float]:
+        """Genres where the user consistently gives high ratings (4-5 stars).
+        
+        Returns a dict of genre -> avg_rating for genres with avg >= 4.0.
+        These are the user's TRUE favorites, not just what they swipe on.
+        """
+        genre_ratings: Dict[str, List[int]] = defaultdict(list)
+        for m in liked_movies:
+            rating = m.get('rating')
+            genre = m.get('genre', 'General')
+            if rating is not None and rating > 0:
+                genre_ratings[genre].append(rating)
+        
+        high_rated = {}
+        for genre, ratings in genre_ratings.items():
+            if len(ratings) >= 2:  # Need at least 2 ratings to be meaningful
+                avg = sum(ratings) / len(ratings)
+                if avg >= 4.0:
+                    high_rated[genre] = avg
+        
+        return high_rated
+    
     def __repr__(self):
         top = sorted(self.genre_scores.items(), key=lambda x: x[1], reverse=True)[:3]
-        return f"UserProfile(swipes={self.total_swipes}, top={top})"
+        return f"UserProfile(swipes={self.total_swipes}, era={self.era_preference}, top={top})"
 
 
 # ──────────────────────────────────────────────────────────
@@ -139,28 +200,35 @@ class UserProfile:
 # ──────────────────────────────────────────────────────────
 
 class MovieScorer:
-    """Scores each movie using 3 weighted factors.
+    """Scores each movie using 5 weighted factors.
     
-    final_score = (genre_score × 0.60) + (quality_score × 0.25) + (freshness × 0.15)
+    final_score = (genre × 0.40) + (rating_affinity × 0.20) + (quality × 0.15)
+                + (popularity × 0.15) + (era_fit × 0.10)
     """
     
-    GENRE_WEIGHT = 0.60
-    QUALITY_WEIGHT = 0.25
-    FRESHNESS_WEIGHT = 0.15
+    GENRE_WEIGHT = 0.40
+    RATING_AFFINITY_WEIGHT = 0.20
+    QUALITY_WEIGHT = 0.15
+    POPULARITY_WEIGHT = 0.15
+    ERA_FIT_WEIGHT = 0.10
     
     def __init__(self, profile: UserProfile):
         self.profile = profile
     
     def score_movie(self, movie: Movie, now: datetime) -> float:
         """Calculate composite score for a single movie."""
-        genre_score = self.profile.get_genre_score(movie.genre)
+        genre_score = self._genre_score(movie)
+        rating_affinity = self._rating_affinity_score(movie)
         quality_score = self._quality_score(movie)
-        freshness_score = self._freshness_score(movie, now)
+        popularity_score = self._popularity_score(movie)
+        era_fit = self._era_fit_score(movie, now)
         
         return (
             genre_score * self.GENRE_WEIGHT +
+            rating_affinity * self.RATING_AFFINITY_WEIGHT +
             quality_score * self.QUALITY_WEIGHT +
-            freshness_score * self.FRESHNESS_WEIGHT
+            popularity_score * self.POPULARITY_WEIGHT +
+            era_fit * self.ERA_FIT_WEIGHT
         )
     
     def score_movies(self, movies: List[Movie]) -> List[Tuple[Movie, float]]:
@@ -170,6 +238,45 @@ class MovieScorer:
         scored.sort(key=lambda x: x[1], reverse=True)
         return scored
     
+    def _genre_score(self, movie: Movie) -> float:
+        """Genre preference score from user profile.
+        
+        Boosted if the genre is one where the user gives high ratings.
+        """
+        base = self.profile.get_genre_score(movie.genre)
+        
+        # Boost genres the user rates highly (their TRUE favorites)
+        if movie.genre in self.profile.high_rated_genres:
+            boost = 0.1  # +10% for genres with avg rating >= 4.0
+            base = min(0.95, base + boost)
+        
+        return base
+    
+    def _rating_affinity_score(self, movie: Movie) -> float:
+        """How likely the user is to rate this movie highly.
+        
+        Based on TMDB vote_average alignment with user's average rating pattern.
+        If user tends to rate high (generous), boost all movies slightly.
+        If user is critical, boost only high-quality movies.
+        """
+        tmdb_score = (movie.vote_average or 5.0) / 10.0
+        
+        if self.profile.avg_user_rating == 0:
+            return tmdb_score  # No rating data yet
+        
+        # User's rating tendency (1-5 scale normalized to 0-1)
+        user_tendency = self.profile.avg_user_rating / 5.0
+        
+        # If user is generous (avg >= 4), boost mid-range movies too
+        # If user is critical (avg < 3), only boost high-quality
+        if user_tendency >= 0.8:  # Generous rater
+            return min(1.0, tmdb_score * 1.1)
+        elif user_tendency < 0.6:  # Critical rater
+            # Only movies with 7.0+ TMDB get a good score
+            return tmdb_score ** 1.3  # Exponential: punishes mediocre more
+        
+        return tmdb_score
+    
     @staticmethod
     def _quality_score(movie: Movie) -> float:
         """TMDB vote_average normalized to 0-1."""
@@ -177,22 +284,56 @@ class MovieScorer:
         return min(1.0, max(0.0, vote / 10.0))
     
     @staticmethod
-    def _freshness_score(movie: Movie, now: datetime) -> float:
-        """Newer movies get a slight boost. -10% per year from release."""
+    def _popularity_score(movie: Movie) -> float:
+        """Popularity based on vote_count (logarithmic scale).
+        
+        A movie with 10,000 votes is more trustworthy than one with 10.
+        Uses log scale so it doesn't completely dominate.
+        """
+        import math
+        vote_count = getattr(movie, 'vote_count', None) or 0
+        if vote_count <= 0:
+            return 0.3  # Unknown popularity gets a mild score
+        
+        # Log scale: 100 votes → ~0.5, 1000 → ~0.75, 10000 → ~1.0
+        return min(1.0, math.log10(max(1, vote_count)) / 4.0)
+    
+    def _era_fit_score(self, movie: Movie, now: datetime) -> float:
+        """Score based on how well the movie's era fits user preference.
+        
+        Instead of blindly penalizing old movies, checks if the user
+        actually prefers classic, modern, or has no preference.
+        """
         if not movie.release_date:
             return 0.5  # Neutral for unknown dates
         
         try:
-            # Handle both YYYY-MM-DD and just YYYY if TMDB data is sparse
             date_str = movie.release_date
             if len(date_str) == 4:
                 date_str += "-01-01"
             
             release = datetime.strptime(date_str, "%Y-%m-%d")
-            years_old = (now - release).days / 365.25
-            return max(0.0, min(1.0, 1.0 - (years_old * 0.1)))
+            release_year = release.year
         except (ValueError, TypeError):
             return 0.5
+        
+        era_pref = self.profile.era_preference
+        
+        if era_pref == 'classic':
+            # User loves older movies — boost classics, don't penalize them
+            if release_year < 2000:
+                return 0.85
+            elif release_year < 2010:
+                return 0.6
+            return 0.4
+        elif era_pref == 'modern':
+            # User prefers recent — gentle boost for new, mild penalty for old
+            years_old = (now - release).days / 365.25
+            return max(0.2, min(1.0, 1.0 - (years_old * 0.04)))  # -4% per year
+        else:
+            # Mixed preference — very gentle freshness curve
+            years_old = (now - release).days / 365.25
+            return max(0.3, min(1.0, 1.0 - (years_old * 0.02)))  # -2% per year
 
 
 # ──────────────────────────────────────────────────────────
@@ -418,9 +559,13 @@ class RecommendationService:
             self._trigger_prefetch()
             return []
         
-        # STAGE 2: Build user profile
+        # STAGE 2: Build user profile (now with liked movies for deeper analysis)
         genre_stats = self.supabase_ds.get_user_genre_stats(user_id)
-        profile = UserProfile(genre_stats)
+        
+        # Fetch user's rated movies for rating-aware scoring
+        liked_data = self._get_user_liked_movies_light(user_id)
+        
+        profile = UserProfile(genre_stats, liked_data)
         
         logger.info(f"👤 {profile}")
         
@@ -449,6 +594,41 @@ class RecommendationService:
         self._ensure_movie_pool(user_id, len(unseen_movies), limit)
         
         return recommendations
+    
+    def _get_user_liked_movies_light(self, user_id: str) -> List[Dict]:
+        """Fetch a lightweight list of user's liked movies with ratings and genres.
+        
+        Used to build a richer UserProfile with era preference and rating patterns.
+        Only fetches the fields needed for profile analysis (not full movie data).
+        """
+        try:
+            swipes = self.supabase_ds.client.table("user_swipes")\
+                .select("movie_id, rating")\
+                .eq("user_id", user_id)\
+                .eq("is_like", True)\
+                .execute()
+            
+            if not swipes.data:
+                return []
+            
+            movie_ids = [s["movie_id"] for s in swipes.data]
+            rating_map = {s["movie_id"]: s.get("rating", 0) for s in swipes.data}
+            
+            movies_data = self.supabase_ds.get_movies_by_ids(movie_ids)
+            
+            result = []
+            for m in movies_data:
+                result.append({
+                    "id": m["id"],
+                    "genre": m.get("genre", "General"),
+                    "release_date": m.get("release_date", ""),
+                    "rating": rating_map.get(m["id"], 0),
+                })
+            
+            return result
+        except Exception as e:
+            logger.error(f"Failed to fetch liked movies for profile: {e}")
+            return []
 
     def _semantic_recommendations(
         self,
@@ -498,9 +678,10 @@ class RecommendationService:
         if not semantic_movies:
             return []
 
-        # Build profile for scoring + diversity
+        # Build profile for scoring + diversity (enhanced with liked movies)
         genre_stats = self.supabase_ds.get_user_genre_stats(user_id)
-        profile = UserProfile(genre_stats)
+        liked_data = self._get_user_liked_movies_light(user_id)
+        profile = UserProfile(genre_stats, liked_data)
 
         # Score the semantically retrieved candidates
         scorer = MovieScorer(profile)

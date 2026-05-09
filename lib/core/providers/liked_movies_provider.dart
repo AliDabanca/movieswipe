@@ -63,8 +63,6 @@ class LikedMoviesProvider extends ChangeNotifier {
   double get likeRatio => _totalSwipes > 0 ? _totalLikes / _totalSwipes : 0.0;
   List<dynamic> get topGenres => _topGenres;
   List<Map<String, dynamic>> get moodHistory => _moodHistory;
-  String? get currentMood => _currentMood;
-  String? get currentEmoji => _currentEmoji;
   bool get isLoaded => _isLoaded;
   /// Returns true if data is actively loading OR if loadFromApi hasn't been called yet.
   /// This prevents the UI from briefly showing empty state on startup.
@@ -98,26 +96,111 @@ class LikedMoviesProvider extends ChangeNotifier {
     return false;
   }
 
-  /// Dynamic title based on top genre
+  /// Advanced AI Character calculation based on multifaceted user data
   String get movieDnaTitle {
-    if (_totalLikes < 10) return 'Yeni İzleyici';
-    if (_topGenres.isEmpty) return 'Keşifçi';
+    final allMovies = _moviesByGenre.values.expand((list) => list).toList();
+    if (allMovies.length < 5) return 'Yeni Kaşif';
+
+    // 1. Calculate Averages
+    double avgUserRating = 0;
+    int ratedCount = 0;
+    double avgReleaseYear = 0;
+    int yearCount = 0;
     
-    final topGenre = _topGenres[0][0] as String;
-    switch (topGenre) {
-      case 'Action': return 'Aksiyon Tutkunu';
-      case 'Comedy': return 'Kahkaha Avcısı';
-      case 'Drama': return 'Drama Eleştirmeni';
-      case 'Horror': return 'Korkusuz İzleyici';
-      case 'Sci-Fi': 
-      case 'Science Fiction': return 'Bilimkurgu Gezgini';
-      case 'Romance': return 'Romantik Ruh';
-      case 'Animation': return 'Animasyon Sever';
-      case 'Documentary': return 'Bilgi Küpü';
-      case 'Thriller': return 'Gerilim Avcısı';
-      case 'Fantasy': return 'Hayalperest';
-      default: return 'Film Gurmesi';
+    for (final m in allMovies) {
+      final r = m['user_rating'] as int? ?? 0;
+      if (r > 0) {
+        avgUserRating += r;
+        ratedCount++;
+      }
+      final date = m['release_date'] as String? ?? '';
+      if (date.length >= 4) {
+        final year = int.tryParse(date.substring(0, 4)) ?? 0;
+        if (year > 0) {
+          avgReleaseYear += year;
+          yearCount++;
+        }
+      }
     }
+    
+    avgUserRating = ratedCount > 0 ? avgUserRating / ratedCount : 0;
+    avgReleaseYear = yearCount > 0 ? avgReleaseYear / yearCount : 0;
+
+    // 2. Genre Diversity
+    final genreCount = _moviesByGenre.keys.length;
+    final topGenre = _topGenres.isNotEmpty ? _topGenres[0][0] as String : '';
+    
+    // 3. Logic Trees
+    
+    // A. The Nostalgic / Vintage
+    if (avgReleaseYear > 0 && avgReleaseYear < 1995) {
+      if (avgUserRating >= 4) return 'Nostaljik Sinefil';
+      return 'Klasik Dönem Meraklısı';
+    }
+
+    // B. The Critical / Hard to Please
+    if (ratedCount >= 10 && avgUserRating < 3.2) {
+      return 'Zor Beğenen Eleştirmen';
+    }
+
+    // C. The Versatile / Gourmet
+    if (genreCount >= 8) return 'Çok Yönlü Sinefil';
+    
+    // D. Specialized Personas
+    if (topGenre == 'Documentary' || topGenre == 'History') return 'Bilgi Avcısı';
+    if (topGenre == 'Animation') return 'Hayalperest İzleyici';
+    if (topGenre == 'Horror' || topGenre == 'Thriller') {
+      return avgUserRating >= 4 ? 'Adrenalin Bağımlısı' : 'Gerilim Tutkunu';
+    }
+    if (topGenre == 'Sci-Fi' || topGenre == 'Fantasy') return 'Evren Gezgini';
+    if (topGenre == 'Drama' && avgUserRating >= 4.5) return 'Derinlik Arayan Sinefil';
+    
+    // E. Default but smarter
+    if (avgUserRating >= 4.5) return 'Cömert Sinema Sever';
+    if (allMovies.length > 50) return 'Usta Film Gurmesi';
+    
+    return 'Dinamik İzleyici';
+  }
+
+  /// Refined Mood based on recent activity
+  String? get currentMood {
+    if (_recentlyAddedAll.isEmpty) return _currentMood ?? 'Meraklı';
+    
+    // Analyze last 5 movies to determine a "Vibe"
+    final last5 = _recentlyAddedAll.take(5).toList();
+    final genres = last5.map((m) => m['genre'] as String? ?? '').toList();
+    
+    int dark = 0; // Horror, Thriller, Crime
+    int light = 0; // Comedy, Animation, Family
+    int emotional = 0; // Romance, Drama
+    int thought = 0; // Mystery, Sci-Fi, Documentary
+    
+    for (final g in genres) {
+      if (['Horror', 'Thriller', 'Crime'].contains(g)) dark++;
+      if (['Comedy', 'Animation', 'Family'].contains(g)) light++;
+      if (['Romance', 'Drama'].contains(g)) emotional++;
+      if (['Mystery', 'Sci-Fi', 'Documentary', 'Science Fiction'].contains(g)) thought++;
+    }
+
+    if (dark >= 2) return 'Gergin / Heyecanlı';
+    if (light >= 2) return 'Neşeli / Eğlenceli';
+    if (emotional >= 2) return 'Duygusal / Melankolik';
+    if (thought >= 2) return 'Düşünceli / Meraklı';
+    
+    return _currentMood ?? 'Keşifçi';
+  }
+
+  String? get currentEmoji {
+    final mood = currentMood;
+    if (mood == null) return _currentEmoji ?? '🎭';
+    
+    if (mood.contains('Gergin')) return '😰';
+    if (mood.contains('Neşeli')) return '😆';
+    if (mood.contains('Duygusal')) return '🥺';
+    if (mood.contains('Düşünceli')) return '🤔';
+    if (mood.contains('Keşifçi')) return '🔍';
+    
+    return _currentEmoji ?? '✨';
   }
 
   /// List of ALL achievements with unlock status

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:movieswipe/core/utils/genre_translator.dart';
 import 'package:movieswipe/core/network/api_client.dart';
 import 'package:movieswipe/core/providers/auth_provider.dart';
 import 'package:movieswipe/core/providers/liked_movies_provider.dart';
@@ -486,7 +487,7 @@ class _MovieResultTile extends StatelessWidget {
                   children: [
                     Text(movie.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600), maxLines: 2),
                     const SizedBox(height: 4),
-                    Text(movie.genre, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12)),
+                    Text(GenreTranslator.translate(movie.genre), style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12)),
                   ],
                 ),
               ),

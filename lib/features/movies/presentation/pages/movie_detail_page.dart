@@ -13,6 +13,8 @@ import 'package:movieswipe/core/providers/liked_movies_provider.dart';
 import 'package:movieswipe/core/providers/collections_provider.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_bloc.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_event.dart';
+import 'package:movieswipe/core/utils/genre_translator.dart';
+
 
 /// Premium movie detail page with hero poster, credits, and similar movies
 class MovieDetailPage extends StatefulWidget {
@@ -556,9 +558,9 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   Widget _buildMetadataChips(MovieDetailModel d) {
     final items = <String>[];
     if (d.genres.isNotEmpty) {
-      items.add(d.genres.take(2).join(' · '));
+      items.add(d.genres.take(2).map((g) => GenreTranslator.translate(g)).join(' · '));
     } else {
-      items.add(d.genre);
+      items.add(GenreTranslator.translate(d.genre));
     }
     if (d.releaseDate != null && d.releaseDate!.length >= 4) {
       items.add(d.releaseDate!.substring(0, 4));

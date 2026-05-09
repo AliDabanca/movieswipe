@@ -66,12 +66,16 @@ class _LoginPageState extends State<LoginPage>
     if (!mounted) return;
 
     if (success) {
-      setState(() => _showSuccess = true);
+      if (mounted) {
+        setState(() => _showSuccess = true);
+      }
       // Brief success animation before navigation takes over
       await Future.delayed(const Duration(milliseconds: 800));
     } else {
       // Shake the form on error
-      _shakeController.forward(from: 0);
+      if (mounted) {
+        _shakeController.forward(from: 0);
+      }
     }
   }
 

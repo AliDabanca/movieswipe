@@ -15,6 +15,7 @@ class ApiClient {
     final session = Supabase.instance.client.auth.currentSession;
     return {
       'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
       if (session != null) 'Authorization': 'Bearer ${session.accessToken}',
     };
   }

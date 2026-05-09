@@ -53,7 +53,7 @@ class _SearchPageState extends State<SearchPage> {
           onChanged: _onSearchChanged,
           style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(
-            hintText: 'Search movies...',
+            hintText: 'Film ara...',
             hintStyle: TextStyle(color: Colors.white70),
             border: InputBorder.none,
           ),
@@ -91,7 +91,7 @@ class _SearchPageState extends State<SearchPage> {
                     Icon(Icons.search, size: 80, color: Colors.grey[300]),
                     const SizedBox(height: 16),
                     Text(
-                      'Search for movies to add to your list',
+                      'Listene eklemek için film ara',
                       style: TextStyle(color: Colors.grey[500], fontSize: 16),
                     ),
                   ],
@@ -150,7 +150,7 @@ class _SearchPageState extends State<SearchPage> {
           movie.name,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        subtitle: Text('Release: ${movie.releaseDate ?? "Unknown"}'),
+        subtitle: Text('Yayın: ${movie.releaseDate ?? "Bilinmiyor"}'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -167,7 +167,7 @@ class _SearchPageState extends State<SearchPage> {
                     ),
                   );
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Passed on ${movie.name}')),
+                    SnackBar(content: Text('${movie.name} geçildi')),
                   );
                 }
               },
@@ -185,7 +185,7 @@ class _SearchPageState extends State<SearchPage> {
                     ),
                   );
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Liked ${movie.name}')),
+                    SnackBar(content: Text('${movie.name} beğenildi')),
                   );
                 }
               },

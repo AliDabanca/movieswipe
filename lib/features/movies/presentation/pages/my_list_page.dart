@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:movieswipe/core/presentation/widgets/logo_loader.dart';
+import 'package:movieswipe/core/utils/genre_translator.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
+import 'package:movieswipe/core/utils/genre_translator.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:movieswipe/core/providers/liked_movies_provider.dart';
 import 'package:movieswipe/core/providers/collections_provider.dart';
@@ -527,7 +529,7 @@ class _MyListContentState extends State<_MyListContent> {
               ],
               flexibleSpace: FlexibleSpaceBar(
                 title: const Text(
-                  'My List',
+                  'Listem',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -552,7 +554,7 @@ class _MyListContentState extends State<_MyListContent> {
                   style: const TextStyle(color: Colors.white),
                   cursorColor: Colors.white,
                   decoration: InputDecoration(
-                    hintText: 'Search your movies...',
+                    hintText: 'Filmlerini ara...',
                     hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
                     prefixIcon: Icon(Icons.search, color: Colors.white.withValues(alpha: 0.7)),
                     suffixIcon: _searchQuery.isNotEmpty
@@ -628,7 +630,9 @@ class _MyListContentState extends State<_MyListContent> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                _selectedGenre ?? 'Categories',
+                                _selectedGenre != null 
+                                    ? GenreTranslator.translate(_selectedGenre!) 
+                                    : 'Kategoriler',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 12,
@@ -669,9 +673,9 @@ class _MyListContentState extends State<_MyListContent> {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            _buildGenreChip('All', null, provider),
+                            _buildGenreChip('Hepsi', null, provider),
                             ...provider.moviesByGenre.keys.map(
-                              (genre) => _buildGenreChip(genre, genre, provider),
+                              (genre) => _buildGenreChip(GenreTranslator.translate(genre), genre, provider),
                             ),
                           ],
                         ),
@@ -817,7 +821,7 @@ class _MyListContentState extends State<_MyListContent> {
               ),
               const SizedBox(width: 12),
               Text(
-                genre,
+                GenreTranslator.translate(genre),
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,

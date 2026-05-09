@@ -440,7 +440,7 @@ class _AddFromMyListSheetState extends State<_AddFromMyListSheet> {
             ),
             const SizedBox(height: 16),
             const Text(
-              "My List'ten Film Ekle",
+              "Listem'den Film Ekle",
               style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
@@ -505,7 +505,7 @@ class _AddFromMyListSheetState extends State<_AddFromMyListSheet> {
                     final movieId = movie['id'] as int;
                     final movieName = movie['name'] as String? ?? 'Bilinmeyen Film';
                     final moviePosterPath = movie['poster_path'] as String?;
-                    final movieGenre = movie['genre'] as String? ?? 'General';
+                    final movieGenre = movie['genre'] as String? ?? 'Genel';
                     final userRating = movie['user_rating'] as int?;
                     final voteAverage = (movie['vote_average'] as num?)?.toDouble();
 

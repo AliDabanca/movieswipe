@@ -6,6 +6,7 @@ import 'package:movieswipe/core/theme/app_theme.dart';
 import 'package:movieswipe/features/movies/domain/entities/movie.dart';
 import 'package:movieswipe/features/movies/presentation/bloc/movies_bloc.dart';
 import 'package:movieswipe/features/movies/presentation/pages/movie_detail_page.dart';
+import 'package:movieswipe/core/utils/genre_translator.dart';
 
 /// Movie card widget with swipe actions and tap-to-detail navigation
 class MovieCard extends StatelessWidget {
@@ -270,7 +271,7 @@ class MovieCard extends StatelessWidget {
                       ),
                     ),
                     child: Text(
-                      movie.genre,
+                      GenreTranslator.translate(movie.genre),
                       style: TextStyle(
                         color: AppTheme.accent.withValues(alpha: 0.9),
                         fontSize: 12,

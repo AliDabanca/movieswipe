@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Authentication provider using Supabase Auth
@@ -15,6 +16,7 @@ class AuthProvider extends ChangeNotifier {
   bool _profileChecked = false;
   bool _needsEmailConfirmation = false;
   bool _onboardingCompleted = false;
+  bool _hasSeenIntro = false;
 
   /// Guards against concurrent auth operations
   bool _isAuthOperationInProgress = false;
@@ -39,10 +41,16 @@ class AuthProvider extends ChangeNotifier {
   bool get profileChecked => _profileChecked;
   bool get onboardingCompleted => _onboardingCompleted;
   bool get needsEmailConfirmation => _needsEmailConfirmation;
+  bool get hasSeenIntro => _hasSeenIntro;
 
   SupabaseClient get _client => Supabase.instance.client;
 
-  void _init() {
+  Future<void> _init() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _hasSeenIntro = prefs.getBool('has_seen_intro') ?? false;
+    } catch (_) {}
+
     _user = _client.auth.currentUser;
     
     if (_user != null) {
@@ -309,6 +317,15 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Failed to mark onboarding completed: $e');
     }
+  }
+
+  Future<void> completeIntro() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('has_seen_intro', true);
+      _hasSeenIntro = true;
+      notifyListeners();
+    } catch (_) {}
   }
 
   Future<void> signOut() async {

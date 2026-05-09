@@ -30,7 +30,7 @@ class MoodRecommendationRequest(BaseModel):
     )
 
 
-@router.get("/", response_model=RecommendationResponse)
+@router.get("", response_model=RecommendationResponse)
 def get_recommendations(
     user_id: str = Depends(get_current_user_id),
     limit: int = Query(50, ge=1, le=100, description="Number of recommendations")

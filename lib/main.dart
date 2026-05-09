@@ -10,6 +10,7 @@ import 'package:movieswipe/core/providers/collections_provider.dart';
 import 'package:movieswipe/features/auth/presentation/pages/login_page.dart';
 import 'package:movieswipe/features/auth/presentation/pages/username_page.dart';
 import 'package:movieswipe/features/onboarding/presentation/pages/onboarding_page.dart';
+import 'package:movieswipe/features/onboarding/presentation/pages/welcome_page.dart';
 import 'package:movieswipe/features/navigation/main_navigation.dart';
 import 'package:movieswipe/core/presentation/widgets/logo_loader.dart';
 
@@ -61,11 +62,11 @@ class MyApp extends StatelessWidget {
               );
             }
 
-            // Not authenticated → login
-            // Also covers the needsEmailConfirmation state:
-            // signUp signs the user out, so isAuthenticated is false,
-            // and the register page handles showing the email confirmation UI.
+            // Not authenticated → Welcome / Landing Page or Login
             if (!auth.isAuthenticated) {
+              if (!auth.hasSeenIntro) {
+                return const WelcomePage();
+              }
               return const LoginPage();
             }
 

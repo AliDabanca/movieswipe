@@ -33,8 +33,13 @@ def get_current_user_id(request: Request) -> str:
     token = auth_header.split(" ")[1]
     
     try:
-        # Reusing the global Supabase client
-        user_response = supabase.auth.get_user(token)
+        # Create a local client for auth to avoid thread-safety/concurrency issues 
+        # that happen when multiple requests use the global client simultaneously.
+        from supabase import create_client
+        from app.core.config import settings
+        local_supabase = create_client(settings.supabase_url, settings.supabase_key)
+        
+        user_response = local_supabase.auth.get_user(token)
         
         if not user_response or not user_response.user:
             logger.warning("Invalid or expired session token provided")
