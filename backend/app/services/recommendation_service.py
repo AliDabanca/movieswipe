@@ -651,6 +651,44 @@ class RecommendationService:
             "genre_stats_raw": genre_stats,
         }
     
+    def get_daily_activity(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get daily swipe activity for the last 7 days."""
+        from datetime import datetime, timedelta, timezone
+
+        now = datetime.now(timezone.utc)
+        seven_days_ago = (now - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+        swipes = self.supabase_ds.client.table("user_swipes")\
+            .select("swiped_at, is_like")\
+            .eq("user_id", user_id)\
+            .gte("swiped_at", seven_days_ago.isoformat())\
+            .execute()
+
+        # Build day buckets for 7 days
+        day_buckets: Dict[str, Dict[str, int]] = {}
+        for i in range(7):
+            d = (seven_days_ago + timedelta(days=i)).strftime("%Y-%m-%d")
+            day_buckets[d] = {"total": 0, "likes": 0, "passes": 0}
+
+        for s in (swipes.data or []):
+            day_str = s["swiped_at"][:10]  # "YYYY-MM-DD"
+            if day_str in day_buckets:
+                day_buckets[day_str]["total"] += 1
+                if s.get("is_like"):
+                    day_buckets[day_str]["likes"] += 1
+                else:
+                    day_buckets[day_str]["passes"] += 1
+
+        result = []
+        for date_str in sorted(day_buckets.keys()):
+            result.append({
+                "date": date_str,
+                "total": day_buckets[date_str]["total"],
+                "likes": day_buckets[date_str]["likes"],
+                "passes": day_buckets[date_str]["passes"],
+            })
+        return result
+
     def get_liked_movies_by_genre(self, user_id: str) -> Dict[str, Any]:
         """Get user's liked movies grouped by genre and the recent 10 additions."""
         liked_swipes = self.supabase_ds.client.table("user_swipes")\

@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:movieswipe/core/theme/app_theme.dart';
 
 /// A premium radar chart widget that visually represents
 /// the user's movie genre DNA.
@@ -206,13 +207,13 @@ class _RadarChartPainter extends CustomPainter {
 
     // Fill with gradient-like effect
     final fillPaint = Paint()
-      ..color = const Color(0xFFE94560).withValues(alpha: 0.15 * animationValue)
+      ..color = AppTheme.accent.withValues(alpha: 0.15 * animationValue)
       ..style = PaintingStyle.fill;
     canvas.drawPath(dataPath, fillPaint);
 
     // Stroke
     final strokePaint = Paint()
-      ..color = const Color(0xFFE94560).withValues(alpha: 0.7 * animationValue)
+      ..color = AppTheme.accent.withValues(alpha: 0.7 * animationValue)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0
       ..strokeJoin = StrokeJoin.round;
@@ -232,13 +233,13 @@ class _RadarChartPainter extends CustomPainter {
       // Outer glow
       final glowPaint = Paint()
         ..color =
-            const Color(0xFFE94560).withValues(alpha: 0.3 * animationValue)
+            AppTheme.accent.withValues(alpha: 0.3 * animationValue)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
       canvas.drawCircle(Offset(x, y), 5, glowPaint);
 
       // Solid dot
       final dotPaint = Paint()
-        ..color = const Color(0xFFE94560).withValues(alpha: animationValue)
+        ..color = AppTheme.accent.withValues(alpha: animationValue)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(Offset(x, y), 3.5, dotPaint);
 
@@ -275,7 +276,7 @@ class _RadarChartPainter extends CustomPainter {
             TextSpan(
               text: '$count',
               style: TextStyle(
-                color: const Color(0xFFE94560)
+                color: AppTheme.accent
                     .withValues(alpha: 0.9 * animationValue),
                 fontSize: 10,
                 fontWeight: FontWeight.bold,

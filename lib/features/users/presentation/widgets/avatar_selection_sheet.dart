@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:movieswipe/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:movieswipe/core/providers/auth_provider.dart';
 
@@ -78,12 +79,12 @@ class AvatarSelectionSheet extends StatelessWidget {
                         child: Container(
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? const Color(0xFFe94560).withValues(alpha: 0.2)
+                                ? AppTheme.accent.withValues(alpha: 0.2)
                                 : Colors.white.withValues(alpha: 0.05),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                               color: isSelected
-                                  ? const Color(0xFFe94560)
+                                  ? AppTheme.accent
                                   : Colors.white.withValues(alpha: 0.1),
                               width: 2,
                             ),

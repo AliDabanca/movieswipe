@@ -24,6 +24,13 @@ def get_friends(user_id: str = Depends(get_current_user_id)):
     return social_service.get_friends(user_id)
 
 
+@router.get("/count/{user_id}")
+def get_friend_count(user_id: str):
+    """Get friend count for a specific user."""
+    count = social_service.get_friend_count(user_id)
+    return {"count": count}
+
+
 @router.get("/requests/incoming")
 def get_incoming_requests(user_id: str = Depends(get_current_user_id)):
     """Get pending incoming friend requests with sender info."""

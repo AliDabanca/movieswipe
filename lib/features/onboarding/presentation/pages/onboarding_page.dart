@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:movieswipe/core/providers/auth_provider.dart';
+import 'package:movieswipe/core/theme/app_theme.dart';
 import 'package:movieswipe/core/network/api_client.dart';
 
 /// Onboarding page for new users — collects genre & movie preferences
@@ -137,7 +138,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F1E),
+      backgroundColor: AppTheme.midnight,
       body: Stack(
         children: [
           // Background gradient
@@ -149,7 +150,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   end: Alignment.bottomRight,
                   colors: [
                     Color(0xFF1a1a3e),
-                    Color(0xFF0F0F1E),
+                    AppTheme.midnight,
                     Color(0xFF0a0a1a),
                   ],
                 ),
@@ -165,7 +166,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               height: 250,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFe94560).withValues(alpha: 0.15),
+                color: AppTheme.accent.withValues(alpha: 0.15),
               ),
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
@@ -258,7 +259,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      CircularProgressIndicator(color: Color(0xFFe94560)),
+                      CircularProgressIndicator(color: AppTheme.accent),
                       SizedBox(height: 16),
                       Text(
                         'Film zevklerin kaydediliyor...',
@@ -344,7 +345,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               child: ElevatedButton(
                 onPressed: _selectedGenres.length >= 3 ? _goToMovieSelection : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFe94560),
+                  backgroundColor: AppTheme.accent,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -379,19 +380,19 @@ class _OnboardingPageState extends State<OnboardingPage> {
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFFe94560).withValues(alpha: 0.25)
+              ? AppTheme.accent.withValues(alpha: 0.25)
               : Colors.white.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFFe94560)
+                ? AppTheme.accent
                 : Colors.white.withValues(alpha: 0.1),
             width: isSelected ? 2 : 1,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: const Color(0xFFe94560).withValues(alpha: 0.3),
+                    color: AppTheme.accent.withValues(alpha: 0.3),
                     blurRadius: 12,
                     spreadRadius: 0,
                   )
@@ -418,7 +419,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             if (isSelected)
               const Padding(
                 padding: EdgeInsets.only(top: 2),
-                child: Icon(Icons.check_circle, color: Color(0xFFe94560), size: 16),
+                child: Icon(Icons.check_circle, color: AppTheme.accent, size: 16),
               ),
           ],
         ),
@@ -472,7 +473,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
           Expanded(
             child: _isLoadingMovies
                 ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFFe94560)),
+                    child: CircularProgressIndicator(color: AppTheme.accent),
                   )
                 : _moviePool.isEmpty
                     ? Center(
@@ -510,7 +511,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     ? _completeOnboarding
                     : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFe94560),
+                  backgroundColor: AppTheme.accent,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -551,14 +552,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFFe94560)
+                ? AppTheme.accent
                 : Colors.transparent,
             width: isSelected ? 3 : 0,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: const Color(0xFFe94560).withValues(alpha: 0.4),
+                    color: AppTheme.accent.withValues(alpha: 0.4),
                     blurRadius: 12,
                     spreadRadius: 0,
                   ),
@@ -608,7 +609,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               // Selected overlay
               if (isSelected)
                 Container(
-                  color: const Color(0xFFe94560).withValues(alpha: 0.3),
+                  color: AppTheme.accent.withValues(alpha: 0.3),
                   child: const Center(
                     child: Icon(
                       Icons.check_circle,

@@ -14,6 +14,41 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     on<RejectRequestEvent>(_onRejectRequest);
     on<SearchUsersEvent>(_onSearchUsers);
     on<LoadFriendProfileEvent>(_onLoadFriendProfile);
+    on<LoadFriendCountEvent>(_onLoadFriendCount);
+    on<LoadNotificationsEvent>(_onLoadNotifications);
+    on<MarkNotificationReadEvent>(_onMarkNotificationRead);
+  }
+
+  Future<void> _onLoadNotifications(
+    LoadNotificationsEvent event,
+    Emitter<SocialState> emit,
+  ) async {
+    emit(SocialLoading());
+    final result = await repository.getNotifications();
+    result.fold(
+      (failure) => emit(SocialError(failure.message)),
+      (notifications) => emit(NotificationsLoaded(notifications)),
+    );
+  }
+
+  Future<void> _onMarkNotificationRead(
+    MarkNotificationReadEvent event,
+    Emitter<SocialState> emit,
+  ) async {
+    await repository.markNotificationAsRead(event.notificationId);
+    // Silent update or reload? Usually silent is fine for 'read' status
+    add(LoadNotificationsEvent());
+  }
+
+  Future<void> _onLoadFriendCount(
+    LoadFriendCountEvent event,
+    Emitter<SocialState> emit,
+  ) async {
+    final result = await repository.getFriendCount(event.userId);
+    result.fold(
+      (failure) => emit(SocialError(failure.message)),
+      (count) => emit(FriendCountLoaded(count)),
+    );
   }
 
   Future<void> _onLoadFriends(
@@ -24,7 +59,10 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     final result = await repository.getFriends();
     result.fold(
       (failure) => emit(SocialError(failure.message)),
-      (friends) => emit(FriendsLoaded(friends)),
+      (friends) {
+        emit(FriendsLoaded(friends));
+        emit(FriendCountLoaded(friends.length));
+      },
     );
   }
 
@@ -66,6 +104,7 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
         emit(const SocialSuccess('Arkadaşlık isteği kabul edildi!'));
         // Reload both lists
         add(LoadFriendsEvent());
+        add(LoadIncomingRequestsEvent());
       },
     );
   }
