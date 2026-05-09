@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:movieswipe/core/network/api_client.dart';
+import 'package:movieswipe/core/providers/liked_movies_provider.dart';
 
 /// A compact bar chart showing the user's daily swipe activity for the last 7 days.
 /// Tapping a bar reveals the like/pass breakdown for that day.
@@ -18,6 +20,7 @@ class _DailyActivityChartState extends State<DailyActivityChart>
   int? _selectedIndex;
   late AnimationController _animController;
   late Animation<double> _animValue;
+  int _lastKnownSwipes = -1;
 
   @override
   void initState() {
@@ -34,25 +37,43 @@ class _DailyActivityChartState extends State<DailyActivityChart>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Watch totalSwipes so we can refresh automatically when the user swipes
+    final currentSwipes = Provider.of<LikedMoviesProvider>(context).totalSwipes;
+    if (_lastKnownSwipes != -1 && currentSwipes != _lastKnownSwipes) {
+      _fetchData(isRefresh: true);
+    }
+    _lastKnownSwipes = currentSwipes;
+  }
+
+  @override
   void dispose() {
     _animController.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchData() async {
+  Future<void> _fetchData({bool isRefresh = false}) async {
     try {
+      if (!isRefresh) {
+        setState(() => _isLoading = true);
+      }
       final response = await _apiClient.get('/users/me/daily-activity');
       if (response is Map<String, dynamic>) {
         final list = response['daily_activity'] as List<dynamic>? ?? [];
-        setState(() {
-          _days = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-          _isLoading = false;
-        });
-        _animController.forward();
+        if (mounted) {
+          setState(() {
+            _days = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+            _isLoading = false;
+          });
+          _animController.forward(from: 0.0);
+        }
       }
     } catch (e) {
       debugPrint('❌ Failed to load daily activity: $e');
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
