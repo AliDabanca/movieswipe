@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.errors import DomainException, NotFoundError, ValidationError
-from app.presentation.api.routes import movies, recommendations, users, sync, search, social, collections, notifications
+from app.presentation.api.routes import movies, recommendations, users, sync, search, social, collections, notifications, dm
 
 # Configure logging - single handler to avoid duplicate output
 logging.basicConfig(
@@ -142,3 +142,4 @@ app.include_router(search.router)
 app.include_router(social.router)
 app.include_router(collections.router)
 app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+app.include_router(dm.router)

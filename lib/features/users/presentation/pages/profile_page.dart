@@ -17,6 +17,9 @@ import 'package:movieswipe/features/social/presentation/bloc/social_event.dart';
 import 'package:movieswipe/features/social/presentation/bloc/social_state.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:movieswipe/core/presentation/widgets/logo_loader.dart';
+import 'package:movieswipe/features/social/presentation/pages/movie_dm_list_page.dart';
+import 'package:movieswipe/features/social/presentation/bloc/dm_bloc.dart';
+import 'package:movieswipe/core/di/injection_container.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -481,6 +484,28 @@ class _ProfilePageState extends State<ProfilePage> {
                         color: AppTheme.accent, size: 20),
                   ),
                 ),
+              IconButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => BlocProvider(
+                        create: (_) => sl<DmBloc>(),
+                        child: const MovieDmListPage(),
+                      ),
+                    ),
+                  );
+                },
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.local_play_outlined,
+                      color: Colors.white, size: 20),
+                ),
+              ),
               IconButton(
                 onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
                 icon: Container(
