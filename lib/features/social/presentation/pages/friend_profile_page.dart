@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:movieswipe/core/theme/app_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:movieswipe/features/users/presentation/widgets/streak_card.dart';
 import '../bloc/social_bloc.dart';
 import '../bloc/social_event.dart';
 import '../bloc/social_state.dart';
@@ -109,6 +110,13 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
             padding: EdgeInsets.only(
                 top: MediaQuery.of(context).padding.top + 60),
             child: _buildHeader(friend),
+          ),
+        ),
+        // Streak Card 🔥
+        SliverToBoxAdapter(
+          child: StreakCard(
+            currentStreak: friend.currentStreak,
+            bestStreak: friend.bestStreak,
           ),
         ),
         // Genre badges

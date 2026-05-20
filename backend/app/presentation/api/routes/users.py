@@ -34,7 +34,9 @@ def get_my_profile(user_id: str = Depends(get_current_user_id)):
                 "avatar_url": profile_data.data.get("avatar_url"),
                 "cover_photo_url": profile_data.data.get("cover_photo_url"),
                 "username": profile_data.data.get("username"),
-                "pinned_movie_ids": profile_data.data.get("pinned_movie_ids", [])
+                "pinned_movie_ids": profile_data.data.get("pinned_movie_ids", []),
+                "current_streak": profile_data.data.get("current_streak", 0),
+                "best_streak": profile_data.data.get("best_streak", 0)
             })
         return result
     except Exception as e:

@@ -8,6 +8,8 @@ class FriendEntity extends Equatable {
   final String? avatarUrl;
   final bool isFriend;
   final bool isSelf;
+  final int currentStreak;
+  final int bestStreak;
 
   const FriendEntity({
     required this.id,
@@ -16,10 +18,12 @@ class FriendEntity extends Equatable {
     this.avatarUrl,
     this.isFriend = false,
     this.isSelf = false,
+    this.currentStreak = 0,
+    this.bestStreak = 0,
   });
 
   @override
-  List<Object?> get props => [id, username, displayName, avatarUrl, isFriend, isSelf];
+  List<Object?> get props => [id, username, displayName, avatarUrl, isFriend, isSelf, currentStreak, bestStreak];
 }
 
 /// A movie in a friend's showcase

@@ -637,6 +637,21 @@ class RecommendationService:
         total_likes = counts.get("total_likes", 0)
         total_passes = counts.get("total_passes", 0)
         
+        # Fetch streak info from profile table
+        try:
+            profile_res = self.supabase_ds.client.table("profiles")\
+                .select("current_streak, best_streak")\
+                .eq("id", user_id)\
+                .single()\
+                .execute()
+            profile_data = profile_res.data or {}
+        except Exception as e:
+            logger.warning(f"Failed to fetch profile streaks for stats: {e}")
+            profile_data = {}
+            
+        current_streak = profile_data.get("current_streak", 0)
+        best_streak = profile_data.get("best_streak", 0)
+        
         return {
             "user_id": user_id,
             "total_swipes": total_swipes,
@@ -649,6 +664,8 @@ class RecommendationService:
                 profile.genre_scores.items(), key=lambda x: x[1], reverse=True
             )[:5],
             "genre_stats_raw": genre_stats,
+            "current_streak": current_streak,
+            "best_streak": best_streak,
         }
     
     def get_daily_activity(self, user_id: str) -> List[Dict[str, Any]]:

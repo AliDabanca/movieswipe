@@ -12,6 +12,8 @@ class UserProfileUpdate(BaseModel):
     avatar_url: Optional[str] = Field(None, description="Avatar image URL")
     cover_photo_url: Optional[str] = Field(None, description="Cover photo URL")
     pinned_movie_ids: Optional[List[int]] = Field(None, description="List of pinned movie IDs")
+    current_streak: Optional[int] = Field(None, description="Current swipe streak count")
+    best_streak: Optional[int] = Field(None, description="Best swipe streak count")
 
     class Config:
         from_attributes = True

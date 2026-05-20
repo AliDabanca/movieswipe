@@ -12,6 +12,8 @@ class FriendResponse(BaseModel):
     avatar_url: Optional[str] = Field(None, description="Avatar URL")
     is_friend: Optional[bool] = Field(None, description="Whether this user is already a friend")
     is_self: Optional[bool] = Field(None, description="Whether this user is the current user")
+    current_streak: Optional[int] = Field(0, description="User's current swipe streak")
+    best_streak: Optional[int] = Field(0, description="User's best swipe streak")
 
     class Config:
         from_attributes = True

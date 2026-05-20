@@ -10,6 +10,7 @@ import 'package:movieswipe/features/users/presentation/widgets/genre_dna_chart.d
 import 'package:movieswipe/features/users/presentation/widgets/current_mood_aura.dart';
 import 'package:movieswipe/features/users/presentation/widgets/cover_selection_sheet.dart';
 import 'package:movieswipe/features/users/presentation/widgets/daily_activity_chart.dart';
+import 'package:movieswipe/features/users/presentation/widgets/streak_card.dart';
 import 'package:movieswipe/features/social/presentation/pages/social_dashboard_page.dart';
 import 'package:movieswipe/features/social/presentation/bloc/social_bloc.dart';
 import 'package:movieswipe/features/social/presentation/bloc/social_event.dart';
@@ -93,6 +94,14 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: _buildMoodSection(likedProvider),
                     ),
                   ),
+
+                // Streak Card
+                SliverToBoxAdapter(
+                  child: StreakCard(
+                    currentStreak: likedProvider.currentStreak,
+                    bestStreak: likedProvider.bestStreak,
+                  ),
+                ),
 
                 // Movie DNA Section
                 if (likedProvider.moviesByGenre.isNotEmpty)
