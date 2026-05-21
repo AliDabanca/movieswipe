@@ -199,7 +199,6 @@ class _DailyActivityChartState extends State<DailyActivityChart>
             children: List.generate(_days.length, (index) {
               final day = _days[index];
               final total = day['total'] as int? ?? 0;
-              final likes = day['likes'] as int? ?? 0;
               final fraction = total / _maxTotal;
               final isSelected = _selectedIndex == index;
 

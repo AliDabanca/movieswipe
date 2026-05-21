@@ -134,11 +134,12 @@ async def health_check():
 
 
 # Include routers
+# IMPORTANT: search must come before movies so /movies/search is not caught by /movies/{movie_id}
+app.include_router(search.router)
 app.include_router(movies.router)
 app.include_router(recommendations.router)
 app.include_router(users.router)
 app.include_router(sync.router)
-app.include_router(search.router)
 app.include_router(social.router)
 app.include_router(collections.router)
 app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])

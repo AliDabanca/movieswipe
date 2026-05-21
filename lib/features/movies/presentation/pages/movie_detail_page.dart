@@ -524,13 +524,16 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                   final name = nameCtrl.text.trim();
                   if (name.isEmpty) return;
                   final provider = context.read<CollectionsProvider>();
+                  final messenger = ScaffoldMessenger.of(context);
                   final newCol = await provider.createCollection(name: name);
                   if (newCol != null) {
                     await provider.addMovieToCollection(newCol.id, widget.movie.id);
                   }
                   if (ctx.mounted) {
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
+                  }
+                  if (mounted) {
+                    messenger.showSnackBar(
                       SnackBar(
                         content: Text('📁 "${widget.movie.name}" "$name" koleksiyonuna eklendi!'),
                         backgroundColor: const Color(0xFF4CAF50),

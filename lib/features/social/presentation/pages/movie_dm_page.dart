@@ -387,7 +387,7 @@ class _MovieDmPageState extends State<MovieDmPage> {
                                               ? Image.network(
                                                   posterUrl,
                                                   fit: BoxFit.cover,
-                                                  errorBuilder: (_, __, ___) =>
+                                                  errorBuilder: (_, _, _) =>
                                                       const Icon(
                                                     Icons.image_not_supported_rounded,
                                                     color: Colors.white24,

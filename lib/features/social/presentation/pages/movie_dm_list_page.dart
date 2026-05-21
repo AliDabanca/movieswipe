@@ -359,7 +359,9 @@ class _MovieDmListPageState extends State<MovieDmListPage> {
                     ),
                   ).then((_) {
                     // Reload list on coming back to ensure unread counts are updated
-                    context.read<DmBloc>().add(LoadDmListEvent());
+                    if (context.mounted) {
+                      context.read<DmBloc>().add(LoadDmListEvent());
+                    }
                   });
                 },
                 leading: Container(

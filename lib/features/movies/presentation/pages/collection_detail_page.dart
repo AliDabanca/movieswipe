@@ -226,7 +226,7 @@ class _CollectionDetailPageState extends State<CollectionDetailPage> {
                         imageUrl: posterUrl,
                         fit: BoxFit.cover,
                         width: double.infinity,
-                        placeholder: (_, __) => Container(
+                        placeholder: (_, _) => Container(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
@@ -242,7 +242,7 @@ class _CollectionDetailPageState extends State<CollectionDetailPage> {
                             ),
                           ),
                         ),
-                        errorWidget: (_, e1, e2) => Container(
+                        errorWidget: (_, _, _) => Container(
                           decoration: const BoxDecoration(
                             gradient: LinearGradient(
                               colors: [Color(0xFF6366F1), Color(0xFFEC4899)],
@@ -499,7 +499,7 @@ class _AddFromMyListSheetState extends State<_AddFromMyListSheet> {
               Expanded(
                 child: ListView.separated(
                   itemCount: filteredMovies.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final movie = filteredMovies[index];
                     final movieId = movie['id'] as int;
@@ -526,7 +526,7 @@ class _AddFromMyListSheetState extends State<_AddFromMyListSheet> {
                             width: 45,
                             height: 65,
                             fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => Container(
+                            errorWidget: (_, _, _) => Container(
                               width: 45,
                               height: 65,
                               color: Colors.white12,
@@ -583,7 +583,7 @@ class _AddFromMyListSheetState extends State<_AddFromMyListSheet> {
                                   ),
                                 );
 
-                                if (mounted) {
+                                if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text('$movieName eklendi!'),

@@ -280,7 +280,7 @@ class _CollectionCard extends StatelessWidget {
           child: Stack(fit: StackFit.expand, children: [
             if (posterUrl != null)
               CachedNetworkImage(imageUrl: posterUrl, fit: BoxFit.cover,
-                  placeholder: (_, __) => _gradientPlaceholder(), errorWidget: (_, __, ___) => _gradientPlaceholder())
+                  placeholder: (_, _) => _gradientPlaceholder(), errorWidget: (_, _, _) => _gradientPlaceholder())
             else _gradientPlaceholder(),
             Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
                 colors: [Colors.transparent, Colors.black.withValues(alpha: 0.8)], stops: const [0.4, 1.0]))),

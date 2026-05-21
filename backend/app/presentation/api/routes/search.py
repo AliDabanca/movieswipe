@@ -8,6 +8,7 @@ from app.core.logger import logger
 
 router = APIRouter(prefix="/movies/search", tags=["search"])
 
+@router.get("")
 @router.get("/")
 async def search_movies(
     query: str = Query(..., min_length=1, description="Search query"),
