@@ -4,8 +4,8 @@
 **MovieSwipe** is a modern movie recommendation and discovery platform. Inspired by the "swipe" mechanic, it allows users to discover movies through a personalized feed, manage their watchlist, and interact with a community of movie enthusiasts. Built with a focus on Clean Architecture, scalability, and high performance using the Antigravity framework principles.
 
 ## Current Status
-**Total Progress: 95%**
-![Progress Bar](https://geps.dev/progress/95?dangerColor=ff0000&warningColor=ffff00&successColor=00ff00)
+**Total Progress: 98%**
+![Progress Bar](https://geps.dev/progress/98?dangerColor=ff0000&warningColor=ffff00&successColor=00ff00)
 
 ---
 
@@ -49,9 +49,11 @@
 - [x] External Share integration (Detail Page + DM ticket reactions via `share_plus`)
 - [x] Premium "Hakkında" (About) App Info Page instead of empty settings
 - [x] Animated "İzleme İlerleme Halkası" (Watchlist Progress Indicator) on collections detail
+- [x] Fix: Daily Swipe Streak (günlük seri) bugs and self-healing local conflict resolution
+- [x] Fix: Suppressed Supabase connection drop issues globally in the FastAPI backend
 
 ### 🚧 In Progress
-- [/] Polishing UI/UX details and final cleanups
+- [/] Final polishing of UI/UX details and cleanups
 
 ### 📅 Planned
 - [ ] Push Notifications for new recommendations
@@ -63,12 +65,15 @@
 ## Changelog
 
 ### 2026-05-27
+- **Fix**: Resolved **Daily Swipe Streak (günlük seri)** getting stuck at `0`. Prevented constructor-time database overrides when unauthenticated, cleared stale date memory records, physically removed cleared dates from SharedPreferences, and implemented a **Self-Healing Conflict Resolution** mechanism to instantly heal and restore active local streaks upon loading.
+- **Fix**: Globally resolved **Supabase connection drop issues** (`RemoteProtocolError: Server disconnected`) in the FastAPI backend by monkeypatching a robust retry policy with exponential backoff directly on the synchronous request executors (`SyncQueryRequestBuilder` and `SyncSingleRequestBuilder` inside `postgrest`).
 - **Feature**: Implemented an animated **"Watchlist / Collection Progress Indicator"** showcasing completion percentages and linear progress meters.
 - **Feature**: Integrated external movie sharing capabilities with `share_plus` plugin.
 - **Feature**: Added "Paylaş" (Share) button directly inside Movie Detail page for both external platforms.
 - **Feature**: Extended DM / Chat screen reactions with an external share option to share recommended movie tickets directly.
 - **Feature**: Replaced the empty Settings page with a premium "Hakkında" (About) page showcasing app information, developers, technology stack, features, and platform status.
 - **Verification**: Ran standard static code verification successfully (`flutter analyze` with 0 issues).
+- **Verification**: Verified robust FastAPI backend startup and database retry enjections without errors.
 
 ### 2026-02-28
 - **Documentation**: Created `AGENTS.md` for AI agent workflow optimization.

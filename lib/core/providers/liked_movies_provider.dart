@@ -454,9 +454,33 @@ class LikedMoviesProvider extends ChangeNotifier {
       _totalPasses = stats['total_passes'] ?? 0;
       _topGenres = stats['top_genres'] as List? ?? [];
       
-      // Update streak from backend stats
-      _currentStreak = stats['current_streak'] ?? 0;
-      _bestStreak = stats['best_streak'] ?? 0;
+      // Update streak from backend stats (with Self-Healing Conflict Resolution)
+      final backendCurrent = stats['current_streak'] ?? 0;
+      final backendBest = stats['best_streak'] ?? 0;
+
+      final today = _todayString();
+      final yesterday = _yesterdayString();
+      
+      // Self-healing conflict resolution: if they have swiped today, their local streak must be at least 1!
+      if (_lastSwipeDate == today && _currentStreak == 0) {
+        _currentStreak = 1;
+      }
+
+      final isLocalActive = _lastSwipeDate == today || _lastSwipeDate == yesterday;
+
+      if (isLocalActive && _currentStreak > backendCurrent) {
+        // Keep active local streak and heal the database
+        if (_currentStreak > _bestStreak) {
+          _bestStreak = _currentStreak;
+        }
+        await _syncStreakToBackend();
+      } else {
+        // Trust backend stats
+        _currentStreak = backendCurrent;
+        if (backendBest > _bestStreak) {
+          _bestStreak = backendBest;
+        }
+      }
       await _saveCounters();
 
       // Parse mood
@@ -824,8 +848,16 @@ class LikedMoviesProvider extends ChangeNotifier {
       _bestStreak = prefs.getInt(_keyBestStreak) ?? 0;
       _lastSwipeDate = prefs.getString(_keyLastSwipeDate);
 
-      // Check if streak is still alive (not broken)
-      _validateStreak();
+      // Do NOT validate or sync to backend during constructor load when _userId is null.
+      // This prevents the guest state from overwriting an authenticated user's active streak.
+      if (_lastSwipeDate != null) {
+        final today = _todayString();
+        final yesterday = _yesterdayString();
+        if (_lastSwipeDate != today && _lastSwipeDate != yesterday) {
+          _currentStreak = 0;
+          _lastSwipeDate = null;
+        }
+      }
       notifyListeners();
     } catch (e) {
       debugPrint('\u26a0\ufe0f Failed to load counters: $e');
@@ -842,6 +874,8 @@ class LikedMoviesProvider extends ChangeNotifier {
       await prefs.setInt('$_keyBestStreak$suffix', _bestStreak);
       if (_lastSwipeDate != null) {
         await prefs.setString('$_keyLastSwipeDate$suffix', _lastSwipeDate!);
+      } else {
+        await prefs.remove('$_keyLastSwipeDate$suffix');
       }
     } catch (e) {
       debugPrint('⚠️ Failed to save counters: $e');
@@ -851,7 +885,10 @@ class LikedMoviesProvider extends ChangeNotifier {
   /// Records today's swipe for streak tracking
   void _recordSwipeDay() {
     final today = _todayString();
-    if (_lastSwipeDate == today) return; // Already swiped today
+    
+    // Only skip if the user already has a valid active streak recorded today.
+    // If _currentStreak is 0, they do not have a streak, so let them start it today.
+    if (_currentStreak > 0 && _lastSwipeDate == today) return;
 
     if (_lastSwipeDate == _yesterdayString()) {
       // Consecutive day! Increment streak
@@ -879,6 +916,12 @@ class LikedMoviesProvider extends ChangeNotifier {
     if (_lastSwipeDate != today && _lastSwipeDate != yesterday) {
       // More than 1 day has passed - streak is broken
       _currentStreak = 0;
+      _lastSwipeDate = null; // Clear the stale date in memory so it's not saved or validated again!
+      _saveCounters();
+      _syncStreakToBackend();
+    } else if (_lastSwipeDate == today && _currentStreak == 0) {
+      // Self-healing conflict resolution: if they have swiped today, their streak must be at least 1!
+      _currentStreak = 1;
       _saveCounters();
       _syncStreakToBackend();
     }
@@ -886,6 +929,7 @@ class LikedMoviesProvider extends ChangeNotifier {
 
   /// Syncs the user's streak to the backend database
   Future<void> _syncStreakToBackend() async {
+    if (_userId == null) return; // Do not sync guest/unauthenticated state
     try {
       await _apiClient.patch(
         '/users/me',
