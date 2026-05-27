@@ -191,7 +191,7 @@ movieswipe/
 │   ├── core/                 # Core utilities (config, DI, errors, theme)
 │   └── features/             # Feature-driven Clean Architecture modules
 │       ├── auth/             # Authentication & User registration
-│       ├── movies/           # Movie Feed Swiper, search, details, collections
+│       ├── movies/           # Movie Feed Swiper, search, details, collections, progress tracking
 │       ├── social/           # Direct Messages (DMs), movie sharing, chat reactions
 │       ├── users/            # Profile pages, daily activity statistics, about page
 │       ├── onboarding/       # Interactive mood survey & onboarding flow

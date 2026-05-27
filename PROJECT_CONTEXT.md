@@ -10,6 +10,7 @@ MovieSwipe, film dünyasını daha eğlenceli ve interaktif bir hale getirmeyi a
 - **TMDB Entegrasyonu:** Gerçek zamanlı film verileri ve senkronizasyonu.
 - **Sosyal DM & Film Paylaşımı:** Arkadaş ekleme, mesajlaşma, film DM kartları, emoji reaksiyonları ve WhatsApp/Instagram gibi harici mecralarda paylaşma özellikleri.
 - **Film DNA & Akıllı Keşif:** Kullanıcının kaydırma zevkine dayalı haftalık ruh hali analizleri, film DNA grafikleri ve yapay zeka destekli akıllı arama önerileri.
+- **İzleme Listesi İlerleme Oranı:** Kullanıcıların koleksiyonlarında yer alan filmlerin kaçını izlediğini gösteren interaktif dairesel ve çizgisel ilerleme göstergeleri.
 
 ## 2. Teknik Stack
 Proje, performans ve ölçeklenebilirlik odaklı modern teknolojilerle inşa edilmiştir:

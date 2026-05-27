@@ -48,6 +48,7 @@
 - [x] Social Features (Following friends, sharing movies/swipes, emoji reactions)
 - [x] External Share integration (Detail Page + DM ticket reactions via `share_plus`)
 - [x] Premium "Hakkında" (About) App Info Page instead of empty settings
+- [x] Animated "İzleme İlerleme Halkası" (Watchlist Progress Indicator) on collections detail
 
 ### 🚧 In Progress
 - [/] Polishing UI/UX details and final cleanups
@@ -62,6 +63,7 @@
 ## Changelog
 
 ### 2026-05-27
+- **Feature**: Implemented an animated **"Watchlist / Collection Progress Indicator"** showcasing completion percentages and linear progress meters.
 - **Feature**: Integrated external movie sharing capabilities with `share_plus` plugin.
 - **Feature**: Added "Paylaş" (Share) button directly inside Movie Detail page for both external platforms.
 - **Feature**: Extended DM / Chat screen reactions with an external share option to share recommended movie tickets directly.
