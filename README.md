@@ -284,4 +284,11 @@ After successfully running the app:
 
 ---
 
+## 👥 Developers
+
+- **Ali DABANCA** - Full-Stack Developer
+- **Mustafa Onur BAYRAM** - Full-Stack Developer
+
+---
+
 **Need Help?** Check the troubleshooting section or reach out to the team! 🚀

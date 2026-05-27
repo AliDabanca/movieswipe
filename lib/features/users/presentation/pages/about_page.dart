@@ -216,14 +216,14 @@ class AboutPage extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         _DeveloperTile(
-                          name: 'Ali Dabanca',
+                          name: 'Ali DABANCA',
                           role: 'Full-Stack Developer',
                           icon: Icons.person_rounded,
                           color: AppTheme.accent,
                         ),
                         const SizedBox(height: 10),
                         _DeveloperTile(
-                          name: 'Risper',
+                          name: 'Mustafa Onur BAYRAM',
                           role: 'Full-Stack Developer',
                           icon: Icons.person_rounded,
                           color: const Color(0xFF7C4DFF),
