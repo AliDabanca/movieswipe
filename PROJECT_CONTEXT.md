@@ -8,6 +8,8 @@ MovieSwipe, film dünyasını daha eğlenceli ve interaktif bir hale getirmeyi a
 - **Kişiselleştirilmiş Akış:** `pgvector` destekli vektör tabanlı öneri motoru.
 - **İzleme Listesi (Watchlist):** Beğenilen filmlerin takibi ve yönetimi.
 - **TMDB Entegrasyonu:** Gerçek zamanlı film verileri ve senkronizasyonu.
+- **Sosyal DM & Film Paylaşımı:** Arkadaş ekleme, mesajlaşma, film DM kartları, emoji reaksiyonları ve WhatsApp/Instagram gibi harici mecralarda paylaşma özellikleri.
+- **Film DNA & Akıllı Keşif:** Kullanıcının kaydırma zevkine dayalı haftalık ruh hali analizleri, film DNA grafikleri ve yapay zeka destekli akıllı arama önerileri.
 
 ## 2. Teknik Stack
 Proje, performans ve ölçeklenebilirlik odaklı modern teknolojilerle inşa edilmiştir:
@@ -63,10 +65,8 @@ Geliştiricilerin bilmesi gereken ana dosyalar:
   - Task: `backend/app/presentation/api/routes/sync.py` (TMDB -> Database).
 
 ## 6. Gelecek Planı (Eksikler & Planlananlar)
-- **Sosyal Özellikler:** Arkadaş takibi ve swipe paylaşımı henüz geliştirme aşamasında.
 - **Push Bildirimler:** Yeni öneriler için Firebase/Supabase entegrasyonu planlanıyor.
 - **Çevrimdışı Mod:** SQLite veya Hive ile yerel önbellekleme desteği eklenecek.
-- **Yorum & Puanlama:** Detaylı film inceleme sistemi plan dahilinde.
 - **CI/CD:** GitHub Actions üzerinden otomatik test ve dağıtım süreçleri.
 
 ---

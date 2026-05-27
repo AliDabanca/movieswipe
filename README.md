@@ -188,11 +188,14 @@ You should see a JSON response with API info.
 ```
 movieswipe/
 ├── lib/                      # Flutter app
-│   ├── core/                 # Core utilities (config, DI, errors)
-│   └── features/movies/      # Movie feature
-│       ├── domain/           # Business logic
-│       ├── data/             # Data layer
-│       └── presentation/     # UI (Bloc, pages, widgets)
+│   ├── core/                 # Core utilities (config, DI, errors, theme)
+│   └── features/             # Feature-driven Clean Architecture modules
+│       ├── auth/             # Authentication & User registration
+│       ├── movies/           # Movie Feed Swiper, search, details, collections
+│       ├── social/           # Direct Messages (DMs), movie sharing, chat reactions
+│       ├── users/            # Profile pages, daily activity statistics, about page
+│       ├── onboarding/       # Interactive mood survey & onboarding flow
+│       └── navigation/       # Global routing & shell navigation structure
 │
 ├── backend/                  # FastAPI backend
 │   └── app/
