@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:movieswipe/core/presentation/widgets/logo_loader.dart';
 import 'package:movieswipe/core/providers/auth_provider.dart';
 import 'package:movieswipe/core/theme/app_theme.dart';
@@ -575,30 +576,79 @@ class _MovieDmPageState extends State<MovieDmPage> {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: emojis.map((emoji) {
-          final isSelected = share.reaction == emoji;
-          return GestureDetector(
+        children: [
+          ...emojis.map((emoji) {
+            final isSelected = share.reaction == emoji;
+            return GestureDetector(
+              onTap: () {
+                context.read<DmBloc>().add(UpdateReactionEvent(
+                      shareId: share.id,
+                      reaction: isSelected ? null : emoji,
+                      friendId: widget.friend.id,
+                    ));
+                setState(() => _activeReactionShareId = null);
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: AnimatedScale(
+                  scale: isSelected ? 1.3 : 1.0,
+                  duration: const Duration(milliseconds: 150),
+                  child: Text(
+                    emoji,
+                    style: const TextStyle(fontSize: 22),
+                  ),
+                ),
+              ),
+            );
+          }),
+          // Divider
+          Container(
+            width: 1,
+            height: 24,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            color: Colors.white.withValues(alpha: 0.15),
+          ),
+          // External share button
+          GestureDetector(
             onTap: () {
-              context.read<DmBloc>().add(UpdateReactionEvent(
-                    shareId: share.id,
-                    reaction: isSelected ? null : emoji,
-                    friendId: widget.friend.id,
-                  ));
               setState(() => _activeReactionShareId = null);
+              _shareMovieExternal(share);
             },
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: AnimatedScale(
-                scale: isSelected ? 1.3 : 1.0,
-                duration: const Duration(milliseconds: 150),
-                child: Text(
-                  emoji,
-                  style: const TextStyle(fontSize: 22),
-                ),
+              child: Icon(
+                Icons.share_rounded,
+                size: 20,
+                color: Colors.white.withValues(alpha: 0.7),
               ),
             ),
-          );
-        }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _shareMovieExternal(MovieShareEntity share) {
+    final movie = share.movie;
+    if (movie == null) return;
+
+    final tmdbUrl = 'https://www.themoviedb.org/movie/${movie.id}';
+    final year = movie.releaseDate != null && movie.releaseDate!.length >= 4
+        ? ' (${movie.releaseDate!.substring(0, 4)})'
+        : '';
+    final rating = movie.voteAverage != null
+        ? ' ⭐ ${movie.voteAverage!.toStringAsFixed(1)}'
+        : '';
+
+    final shareText = '🎬 ${movie.name}$year$rating\n'
+        '${movie.genre}\n\n'
+        '$tmdbUrl\n\n'
+        'MovieSwipe\'da arkadaşımın önerisi! 🍿';
+
+    SharePlus.instance.share(
+      ShareParams(
+        text: shareText,
+        subject: '🎬 ${movie.name} - MovieSwipe',
       ),
     );
   }

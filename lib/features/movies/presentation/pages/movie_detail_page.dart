@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:get_it/get_it.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:movieswipe/features/movies/domain/entities/movie.dart';
 import 'package:movieswipe/features/movies/data/models/movie_model.dart';
 import 'package:movieswipe/features/movies/data/datasources/movie_remote_datasource.dart';
@@ -195,7 +196,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                 const SizedBox(height: 16),
                 _buildStarRating(),
                 const SizedBox(height: 12),
-                _buildAddToCollectionButton(),
+                _buildActionButtonsRow(),
                 if (d.tagline != null && d.tagline!.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   _buildTagline(d.tagline!),
@@ -422,31 +423,90 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     );
   }
 
-  Widget _buildAddToCollectionButton() {
-    return GestureDetector(
-      onTap: () => _showAddToCollectionSheet(),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.playlist_add, color: Colors.white.withValues(alpha: 0.8), size: 20),
-            const SizedBox(width: 8),
-            Text(
-              'Koleksiyona Ekle',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+  Widget _buildActionButtonsRow() {
+    return Row(
+      children: [
+        // Koleksiyona Ekle button
+        Expanded(
+          child: GestureDetector(
+            onTap: () => _showAddToCollectionSheet(),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.playlist_add, color: Colors.white.withValues(alpha: 0.8), size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Koleksiyona Ekle',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
+        const SizedBox(width: 10),
+        // Paylaş button
+        GestureDetector(
+          onTap: _shareMovie,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF7C4DFF).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF7C4DFF).withValues(alpha: 0.3)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.share_rounded, color: Color(0xFF7C4DFF), size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'Paylaş',
+                  style: TextStyle(
+                    color: Color(0xFF7C4DFF),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _shareMovie() {
+    final movie = widget.movie;
+    final tmdbUrl = 'https://www.themoviedb.org/movie/${movie.id}';
+    final year = movie.releaseDate != null && movie.releaseDate!.length >= 4
+        ? ' (${movie.releaseDate!.substring(0, 4)})'
+        : '';
+    final rating = movie.voteAverage != null
+        ? ' ⭐ ${movie.voteAverage!.toStringAsFixed(1)}'
+        : '';
+
+    final shareText = '🎬 ${movie.name}$year$rating\n'
+        '${movie.genre}\n\n'
+        '${movie.overview ?? ""}\n\n'
+        '$tmdbUrl\n\n'
+        'MovieSwipe ile keşfettim! 🍿';
+
+    SharePlus.instance.share(
+      ShareParams(
+        text: shareText,
+        subject: '🎬 ${movie.name} - MovieSwipe',
       ),
     );
   }

@@ -4,8 +4,8 @@
 **MovieSwipe** is a modern movie recommendation and discovery platform. Inspired by the "swipe" mechanic, it allows users to discover movies through a personalized feed, manage their watchlist, and interact with a community of movie enthusiasts. Built with a focus on Clean Architecture, scalability, and high performance using the Antigravity framework principles.
 
 ## Current Status
-**Total Progress: 65%**
-![Progress Bar](https://geps.dev/progress/65?dangerColor=ff0000&warningColor=ffff00&successColor=00ff00)
+**Total Progress: 95%**
+![Progress Bar](https://geps.dev/progress/95?dangerColor=ff0000&warningColor=ffff00&successColor=00ff00)
 
 ---
 
@@ -17,6 +17,7 @@
 - **Functional Tools:** `dartz` (Either for Error Handling)
 - **UI Components:** `flutter_card_swiper`
 - **Native:** Android, iOS, Windows, Web, Linux, macOS support
+- **Sharing:** `share_plus` (External share capabilities)
 
 ### Backend (FastAPI)
 - **Framework:** FastAPI
@@ -40,23 +41,32 @@
 - [x] Movie Swipe UI (Card Swiper implementation)
 - [x] Multi-environment support (`.env.dev`, `.env.test`, `.env.prod`)
 - [x] AGENTS.md (Agent workflow documentation)
+- [x] User Profile Redesign & Username selection flow
+- [x] Personalized Movie Feed (Vector-based recommendations)
+- [x] Watchlist management and persistence
+- [x] Global Error Handling & Professional logging
+- [x] Social Features (Following friends, sharing movies/swipes, emoji reactions)
+- [x] External Share integration (Detail Page + DM ticket reactions via `share_plus`)
+- [x] Premium "Hakkında" (About) App Info Page instead of empty settings
 
 ### 🚧 In Progress
-- [/] User Profile Redesign & Username selection flow
-- [/] Personalized Movie Feed (Vector-based recommendations)
-- [/] Watchlist management and persistence
-- [/] Global Error Handling & Professional logging
+- [/] Polishing UI/UX details and final cleanups
 
 ### 📅 Planned
-- [ ] Social Features (Following friends, sharing swipes)
 - [ ] Push Notifications for new recommendations
 - [ ] Offline Mode (Local caching with SQLite/Hive)
-- [ ] Detailed Movie Reviews & Rating system
 - [ ] CI/CD Pipeline (GitHub Actions)
 
 ---
 
 ## Changelog
+
+### 2026-05-27
+- **Feature**: Integrated external movie sharing capabilities with `share_plus` plugin.
+- **Feature**: Added "Paylaş" (Share) button directly inside Movie Detail page for both external platforms.
+- **Feature**: Extended DM / Chat screen reactions with an external share option to share recommended movie tickets directly.
+- **Feature**: Replaced the empty Settings page with a premium "Hakkında" (About) page showcasing app information, developers, technology stack, features, and platform status.
+- **Verification**: Ran standard static code verification successfully (`flutter analyze` with 0 issues).
 
 ### 2026-02-28
 - **Documentation**: Created `AGENTS.md` for AI agent workflow optimization.

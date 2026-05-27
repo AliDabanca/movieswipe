@@ -20,6 +20,7 @@ import 'package:movieswipe/core/presentation/widgets/logo_loader.dart';
 import 'package:movieswipe/features/social/presentation/pages/movie_dm_list_page.dart';
 import 'package:movieswipe/features/social/presentation/bloc/dm_bloc.dart';
 import 'package:movieswipe/core/di/injection_container.dart';
+import 'package:movieswipe/features/users/presentation/pages/about_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -308,11 +309,14 @@ class _ProfilePageState extends State<ProfilePage> {
                         const SizedBox(height: 4),
 
                         _buildDrawerItem(
-                          icon: Icons.settings_rounded,
-                          label: 'Ayarlar',
+                          icon: Icons.info_outline_rounded,
+                          label: 'Hakkında',
                           onTap: () {
                             Navigator.pop(context);
-                            // TODO: Navigate to settings page
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const AboutPage()),
+                            );
                           },
                         ),
                       ],
