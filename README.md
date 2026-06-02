@@ -1,23 +1,36 @@
 # MovieSwipe 🎬
 
-A modern movie recommendation app built with Flutter (mobile) and FastAPI (backend) following Clean Architecture principles.
+A modern, social, and AI-powered movie discovery platform built with **Flutter** (mobile) and **FastAPI** (backend) following Clean Architecture principles. Features a Tinder-style swipe interface, semantic vector-based recommendations (pgvector), social DM movie sharing, and rich user analytics.
+
+## ✨ Key Features
+
+| Category | Features |
+| :--- | :--- |
+| 🎬 **Movie Discovery** | Tinder-style swipe cards, AI-powered personalized feed, Explainable AI ("Why recommended"), Smart AI Discovery (semantic search), dice roll random suggestion |
+| 📋 **Watchlist** | Collections, watch status tracking, animated progress indicators, movie detail pages |
+| 👥 **Social** | Follow system, DM movie card sharing, emoji reactions, external sharing (WhatsApp, Instagram etc.), friend profiles, notifications |
+| 📊 **Analytics** | Genre DNA radar chart, mood aura visualization, weekly activity charts, daily swipe streak gamification |
+| 🔐 **Auth** | Supabase Auth, JWT middleware, interactive onboarding (cold-start solver) |
 
 ## 🏗️ Architecture
 
 - **Frontend:** Flutter with Clean Architecture (Domain/Data/Presentation layers)
 - **Backend:** FastAPI with Clean Architecture
-- **State Management:** BLoC pattern
+- **State Management:** BLoC pattern (`flutter_bloc`) + Provider
 - **Dependency Injection:** GetIt (Flutter), manual DI (Backend)
-- **Database:** Supabase/PostgreSQL with pgvector (prepared)
-- **Cache:** Redis (prepared)
+- **Database:** Supabase PostgreSQL + pgvector (384-dim HNSW vector search)
+- **Cache:** Redis
+- **ML/NLP:** Sentence-Transformers (all-MiniLM-L6-v2)
+- **Error Handling:** Functional (`dartz` Either type)
 
 ## 🚀 Quick Start for Team Members
 
 ### Prerequisites
 
-- **Flutter:** >= 3.0
+- **Flutter:** >= 3.10.8
 - **Python:** 3.10+
 - **Git:** Latest version
+- **Redis:** (Optional, for caching)
 
 ### 1️⃣ Clone the Repository
 
@@ -187,27 +200,33 @@ You should see a JSON response with API info.
 
 ```
 movieswipe/
-├── lib/                      # Flutter app
-│   ├── core/                 # Core utilities (config, DI, errors, theme)
-│   └── features/             # Feature-driven Clean Architecture modules
-│       ├── auth/             # Authentication & User registration
-│       ├── movies/           # Movie Feed Swiper, search, details, collections, progress tracking
-│       ├── social/           # Direct Messages (DMs), movie sharing, chat reactions
-│       ├── users/            # Profile pages, daily activity statistics, about page
-│       ├── onboarding/       # Interactive mood survey & onboarding flow
-│       └── navigation/       # Global routing & shell navigation structure
+├── lib/                          # Flutter app
+│   ├── core/                     # Core utilities (config, DI, errors, theme, providers)
+│   └── features/                 # Feature-driven Clean Architecture modules
+│       ├── auth/                 # Authentication & registration
+│       ├── movies/               # Swipe feed, search, details, collections, smart discovery
+│       ├── social/               # DMs, movie sharing, chat reactions, friend profiles
+│       ├── users/                # Profile, analytics (DNA, aura, activity, streak), about
+│       ├── onboarding/           # Interactive mood survey & genre selection
+│       └── navigation/           # Global routing & shell navigation
 │
-├── backend/                  # FastAPI backend
+├── backend/                      # FastAPI backend
 │   └── app/
-│       ├── core/             # Config, DB, errors
-│       ├── domain/           # Business entities
-│       ├── data/             # Data models & repos
-│       └── presentation/     # API routes
+│       ├── core/                 # Config, DB (Supabase + retry), security (JWT)
+│       ├── domain/               # Business entities
+│       ├── data/                 # Pydantic models & repos
+│       ├── services/             # Business logic (recommendations, social, DM, sync, etc.)
+│       └── presentation/         # API routes (10 modules)
 │
-├── .env.dev                  # Dev environment (gitignored)
-├── .env.test                 # Test environment (gitignored)
-├── .env.prod                 # Prod environment (gitignored)
-└── .env.example              # Template for team
+├── docs/                         # Documentation
+│   └── GRADUATION_REPORT.md      # Full academic graduation report
+│
+├── .env.dev / .env.test / .env.prod  # Environment files (gitignored)
+├── .env.example                       # Template for team
+├── PROGRESS.md                        # Development progress & changelog
+├── PROJECT_CONTEXT.md                 # Technical context for developers
+├── OPTIMIZATIONS.md                   # Performance optimization plan
+└── AGENTS.md                          # AI agent workflow rules
 ```
 
 ## 🧪 Testing
@@ -223,6 +242,7 @@ pytest
 
 ```bash
 flutter test
+flutter analyze
 ```
 
 ## 🐛 Troubleshooting
@@ -266,8 +286,11 @@ taskkill /PID <process_id> /F
 1. Create a new branch for your feature
 2. Follow Clean Architecture principles
 3. Maintain SOLID principles
-4. Test your changes
-5. Submit a pull request
+4. Use `flutter_bloc` for complex state, `provider` for simple DI
+5. Use `Equatable` for all models/entities (BLoC state comparisons)
+6. Use `dartz` Either for error handling in data/domain layers
+7. Test your changes (`flutter analyze` must pass with 0 errors)
+8. Submit a pull request
 
 ## 📝 Notes
 
@@ -275,22 +298,15 @@ taskkill /PID <process_id> /F
 - Always use `.env.example` as template
 - Keep IP addresses and secrets out of Git
 - Use `--dart-define=FLAVOR=xxx` to switch environments
-
-## 🎯 Next Steps
-
-After successfully running the app:
-
-1. Explore the code structure
-2. Check backend API docs at `/docs`
-3. Review Clean Architecture patterns
-4. Start building features!
+- All FastAPI endpoints must use Pydantic models for validation
+- All database operations must be async (SQLAlchemy asyncio)
 
 ---
 
 ## 👥 Developers
 
-- **Ali DABANCA** - Full-Stack Developer
-- **Mustafa Onur BAYRAM** - Full-Stack Developer
+- **Ali DABANCA** — Full-Stack Developer
+- **Mustafa Onur BAYRAM** — Full-Stack Developer
 
 ---
 
