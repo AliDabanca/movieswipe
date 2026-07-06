@@ -13,7 +13,8 @@ T = TypeVar("T")
 def with_retry(max_retries: int = 3, base_delay: float = 0.5):
     """Decorator: retry on connection/timeout errors with exponential backoff.
     
-    Only retries on network-level failures (timeout, connection reset).
+    Only retries on network-level failures (timeout, connection reset, server disconnect).
+    Correctly inspects chained exceptions (e.__context__ / e.__cause__) to handle wrapped errors.
     Does NOT retry on client errors (4xx) or data errors.
     """
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
@@ -24,14 +25,26 @@ def with_retry(max_retries: int = 3, base_delay: float = 0.5):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
-                    error_str = str(e).lower()
-                    # Only retry on network/timeout/protocol errors
+                    # Gather exception messages across the chain to inspect the root cause
+                    error_parts = [str(e)]
+                    for attr in ["__cause__", "__context__"]:
+                        inner = getattr(e, attr, None)
+                        if inner:
+                            error_parts.append(str(inner))
+                            deep_inner = getattr(inner, attr, None)
+                            if deep_inner:
+                                error_parts.append(str(deep_inner))
+                    
+                    error_str = " ".join(error_parts).lower()
+                    
+                    # Only retry on network/timeout/protocol/disconnect errors
                     is_retryable = any(kw in error_str for kw in [
                         "timeout", "timed out", "connection",
                         "522", "503", "502", "reset",
                         "network", "eof", "broken pipe",
                         "protocol", "disconnected", "terminated"
                     ])
+                    
                     if not is_retryable or attempt == max_retries:
                         raise
                     
@@ -62,7 +75,7 @@ class SupabaseDataSource:
             return response.data
         except Exception as e:
             logger.error(f"Supabase fetch error: {str(e)}", exc_info=True)
-            raise ServerError("Failed to fetch movies")
+            raise ServerError("Failed to fetch movies") from e
     
     def save_movie(self, movie_data: Dict[str, Any]) -> Dict[str, Any]:
         """Save a single movie to Supabase."""
@@ -77,7 +90,7 @@ class SupabaseDataSource:
             return response.data[0]
         except Exception as e:
             logger.error(f"Supabase save error for movie {movie_data.get('id')}: {str(e)}", exc_info=True)
-            raise ServerError("Failed to save movie")
+            raise ServerError("Failed to save movie") from e
     
     @with_retry()
     def save_movies_batch(self, movies_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -91,7 +104,7 @@ class SupabaseDataSource:
             return response.data
         except Exception as e:
             logger.error(f"Supabase batch save error (size: {len(movies_data)}): {str(e)}", exc_info=True)
-            raise ServerError("Failed to save movies")
+            raise ServerError("Failed to save movies") from e
     
     def get_movie_by_id(self, movie_id: int) -> Dict[str, Any]:
         """Get a single movie by ID."""
@@ -106,7 +119,7 @@ class SupabaseDataSource:
             raise
         except Exception as e:
             logger.error(f"Supabase fetch error by ID {movie_id}: {str(e)}", exc_info=True)
-            raise ServerError("Failed to fetch movie details")
+            raise ServerError("Failed to fetch movie details") from e
             
     @with_retry()
     def get_movies_by_ids(self, movie_ids: List[int]) -> List[Dict[str, Any]]:
@@ -130,7 +143,7 @@ class SupabaseDataSource:
             return all_movies
         except Exception as e:
             logger.error(f"Supabase batch fetch error (total ids: {len(movie_ids)}): {str(e)}", exc_info=True)
-            raise ServerError("Failed to fetch movies")
+            raise ServerError("Failed to fetch movies") from e
     
     @with_retry()
     def save_swipe(self, user_id: str, movie_id: int, is_like: bool, rating: int | None = None) -> Dict[str, Any]:
@@ -153,7 +166,7 @@ class SupabaseDataSource:
             return response.data[0]
         except Exception as e:
             logger.error(f"Supabase swipe save error: {str(e)}", exc_info=True)
-            raise ServerError("Failed to save swipe")
+            raise ServerError("Failed to save swipe") from e
 
     def delete_swipe(self, user_id: str, movie_id: int) -> None:
         """Delete a swipe record (unlike/unpass)."""
@@ -166,7 +179,7 @@ class SupabaseDataSource:
             logger.info(f"Deleted swipe for user {user_id} on movie {movie_id}")
         except Exception as e:
             logger.error(f"Supabase swipe deletion error: {str(e)}", exc_info=True)
-            raise ServerError("Failed to delete swipe")
+            raise ServerError("Failed to delete swipe") from e
     
     def update_watch_status(self, user_id: str, movie_id: int, watch_status: str | None) -> None:
         """Update the watch status for a user's swipe record."""
@@ -179,7 +192,7 @@ class SupabaseDataSource:
             logger.info(f"Updated watch status for user {user_id} on movie {movie_id} to '{watch_status}'")
         except Exception as e:
             logger.error(f"Supabase watch status update error: {str(e)}", exc_info=True)
-            raise ServerError("Failed to update watch status")
+            raise ServerError("Failed to update watch status") from e
     
     def get_user_swipes(self, user_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         """Get all swipes for a user."""
@@ -188,7 +201,7 @@ class SupabaseDataSource:
             return response.data
         except Exception as e:
             logger.error(f"Supabase swipe fetch error for user {user_id}: {str(e)}", exc_info=True)
-            raise ServerError("Failed to fetch swipes")
+            raise ServerError("Failed to fetch swipes") from e
     
     def get_user_liked_movie_ids(self, user_id: str) -> List[int]:
         """Get IDs of movies the user liked."""
@@ -197,7 +210,7 @@ class SupabaseDataSource:
             return [swipe["movie_id"] for swipe in response.data]
         except Exception as e:
             logger.error(f"Supabase liked movies fetch error: {str(e)}")
-            raise ServerError("Failed to fetch liked movies")
+            raise ServerError("Failed to fetch liked movies") from e
     
     @with_retry()
     def get_user_swiped_movie_ids(self, user_id: str) -> List[int]:
@@ -207,7 +220,7 @@ class SupabaseDataSource:
             return [swipe["movie_id"] for swipe in response.data]
         except Exception as e:
             logger.error(f"Supabase swiped movies fetch error: {str(e)}")
-            raise ServerError("Failed to fetch swiped movies")
+            raise ServerError("Failed to fetch swiped movies") from e
 
     @with_retry()
     def get_unseen_movies(self, user_id: str, limit: int = 200) -> List[Dict[str, Any]]:
@@ -230,7 +243,7 @@ class SupabaseDataSource:
                 return unseen[:limit]
             except Exception as e:
                 logger.error(f"Critical fallback failure for unseen movies (user {user_id}): {str(e)}", exc_info=True)
-                raise ServerError("Failed to get unseen movies")
+                raise ServerError("Failed to get unseen movies") from e
 
     @with_retry()
     def get_user_genre_stats(self, user_id: str) -> List[Dict[str, Any]]:
@@ -270,7 +283,7 @@ class SupabaseDataSource:
                 return list(genre_stats.values())
             except Exception as e:
                 logger.error(f"Critical fallback failure for genre stats (user {user_id}): {str(e)}", exc_info=True)
-                raise ServerError("Failed to get genre stats")
+                raise ServerError("Failed to get genre stats") from e
 
     @with_retry()
     def get_user_stats_rpc(self, user_id: str) -> Dict[str, int]:
@@ -425,4 +438,4 @@ class SupabaseDataSource:
             raise
         except Exception as e:
             logger.error(f"Supabase profile update error for user {user_id}: {str(e)}", exc_info=True)
-            raise ServerError("Failed to update profile")
+            raise ServerError("Failed to update profile") from e

@@ -49,6 +49,12 @@ class LikedMoviesProvider extends ChangeNotifier {
   int _smartDiscoveryCount = 0;
   int _moodDiscoveryCount = 0;
 
+  // Streak tracking
+  int _currentStreak = 0;
+  int _bestStreak = 0;
+  String? _lastSwipeDate; // ISO date string: 'yyyy-MM-dd'
+  String? _userId;
+
   LikedMoviesProvider({ApiClient? apiClient})
       : _apiClient = apiClient ?? ApiClient(client: null) {
     _loadCounters();
@@ -72,6 +78,10 @@ class LikedMoviesProvider extends ChangeNotifier {
   // Counter Getters
   int get smartDiscoveryCount => _smartDiscoveryCount;
   int get moodDiscoveryCount => _moodDiscoveryCount;
+
+  // Streak Getters
+  int get currentStreak => _currentStreak;
+  int get bestStreak => _bestStreak;
 
   /// Look up the current user rating for a movie by its ID.
   /// Returns null if the movie is not in the liked list or has no rating.
@@ -487,6 +497,7 @@ class LikedMoviesProvider extends ChangeNotifier {
     if (_isLoading) return;
     _isLoading = true;
     _isInitialized = true;
+    _userId = userId;
     notifyListeners();
 
     // Step 1: Load from cache immediately
@@ -525,6 +536,35 @@ class LikedMoviesProvider extends ChangeNotifier {
       _totalLikes = stats['total_likes'] ?? 0;
       _totalPasses = stats['total_passes'] ?? 0;
       _topGenres = stats['top_genres'] as List? ?? [];
+      
+      // Update streak from backend stats (with Self-Healing Conflict Resolution)
+      final backendCurrent = stats['current_streak'] ?? 0;
+      final backendBest = stats['best_streak'] ?? 0;
+
+      final today = _todayString();
+      final yesterday = _yesterdayString();
+      
+      // Self-healing conflict resolution: if they have swiped today, their local streak must be at least 1!
+      if (_lastSwipeDate == today && _currentStreak == 0) {
+        _currentStreak = 1;
+      }
+
+      final isLocalActive = _lastSwipeDate == today || _lastSwipeDate == yesterday;
+
+      if (isLocalActive && _currentStreak > backendCurrent) {
+        // Keep active local streak and heal the database
+        if (_currentStreak > _bestStreak) {
+          _bestStreak = _currentStreak;
+        }
+        await _syncStreakToBackend();
+      } else {
+        // Trust backend stats
+        _currentStreak = backendCurrent;
+        if (backendBest > _bestStreak) {
+          _bestStreak = backendBest;
+        }
+      }
+      await _saveCounters();
 
       // Parse mood
       final moodRes = results[2] as Map<String, dynamic>;
@@ -550,6 +590,15 @@ class LikedMoviesProvider extends ChangeNotifier {
   Future<void> _loadFromCache(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      
+      // Load user-specific counters
+      _smartDiscoveryCount = prefs.getInt('${_keySmartCount}_$userId') ?? 0;
+      _moodDiscoveryCount = prefs.getInt('${_keyMoodCount}_$userId') ?? 0;
+      _currentStreak = prefs.getInt('${_keyCurrentStreak}_$userId') ?? 0;
+      _bestStreak = prefs.getInt('${_keyBestStreak}_$userId') ?? 0;
+      _lastSwipeDate = prefs.getString('${_keyLastSwipeDate}_$userId');
+      _validateStreak();
+
       final moviesJson = prefs.getString('${_cacheKeyMovies}_$userId');
       final statsJson = prefs.getString('${_cacheKeyStats}_$userId');
       final moodJson = prefs.getString('${_cacheKeyMood}_$userId');
@@ -686,6 +735,7 @@ class LikedMoviesProvider extends ChangeNotifier {
       _totalSwipes++;
       _totalLikes++;
       _recalculateTopGenres();
+      _recordSwipeDay();
     }
     notifyListeners();
   }
@@ -694,6 +744,7 @@ class LikedMoviesProvider extends ChangeNotifier {
   void addPass() {
     _totalSwipes++;
     _totalPasses++;
+    _recordSwipeDay();
     notifyListeners();
   }
 
@@ -853,6 +904,10 @@ class LikedMoviesProvider extends ChangeNotifier {
     _moodHistory = [];
     _currentMood = null;
     _currentEmoji = null;
+    _currentStreak = 0;
+    _bestStreak = 0;
+    _lastSwipeDate = null;
+    _userId = null;
     _isLoaded = false;
     _isInitialized = false;
     _isLoading = false;
@@ -863,26 +918,122 @@ class LikedMoviesProvider extends ChangeNotifier {
 
   static const _keySmartCount = 'smart_discovery_count';
   static const _keyMoodCount = 'mood_discovery_count';
+  static const _keyCurrentStreak = 'current_streak';
+  static const _keyBestStreak = 'best_streak';
+  static const _keyLastSwipeDate = 'last_swipe_date';
 
   Future<void> _loadCounters() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       _smartDiscoveryCount = prefs.getInt(_keySmartCount) ?? 0;
       _moodDiscoveryCount = prefs.getInt(_keyMoodCount) ?? 0;
+      _currentStreak = prefs.getInt(_keyCurrentStreak) ?? 0;
+      _bestStreak = prefs.getInt(_keyBestStreak) ?? 0;
+      _lastSwipeDate = prefs.getString(_keyLastSwipeDate);
+
+      // Do NOT validate or sync to backend during constructor load when _userId is null.
+      // This prevents the guest state from overwriting an authenticated user's active streak.
+      if (_lastSwipeDate != null) {
+        final today = _todayString();
+        final yesterday = _yesterdayString();
+        if (_lastSwipeDate != today && _lastSwipeDate != yesterday) {
+          _currentStreak = 0;
+          _lastSwipeDate = null;
+        }
+      }
       notifyListeners();
     } catch (e) {
-      debugPrint('⚠️ Failed to load counters: $e');
+      debugPrint('\u26a0\ufe0f Failed to load counters: $e');
     }
   }
 
   Future<void> _saveCounters() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_keySmartCount, _smartDiscoveryCount);
-      await prefs.setInt(_keyMoodCount, _moodDiscoveryCount);
+      final suffix = _userId != null ? '_$_userId' : '';
+      await prefs.setInt('$_keySmartCount$suffix', _smartDiscoveryCount);
+      await prefs.setInt('$_keyMoodCount$suffix', _moodDiscoveryCount);
+      await prefs.setInt('$_keyCurrentStreak$suffix', _currentStreak);
+      await prefs.setInt('$_keyBestStreak$suffix', _bestStreak);
+      if (_lastSwipeDate != null) {
+        await prefs.setString('$_keyLastSwipeDate$suffix', _lastSwipeDate!);
+      } else {
+        await prefs.remove('$_keyLastSwipeDate$suffix');
+      }
     } catch (e) {
       debugPrint('⚠️ Failed to save counters: $e');
     }
+  }
+
+  /// Records today's swipe for streak tracking
+  void _recordSwipeDay() {
+    final today = _todayString();
+    
+    // Only skip if the user already has a valid active streak recorded today.
+    // If _currentStreak is 0, they do not have a streak, so let them start it today.
+    if (_currentStreak > 0 && _lastSwipeDate == today) return;
+
+    if (_lastSwipeDate == _yesterdayString()) {
+      // Consecutive day! Increment streak
+      _currentStreak++;
+    } else {
+      // Streak broken or first day - start fresh
+      _currentStreak = 1;
+    }
+
+    if (_currentStreak > _bestStreak) {
+      _bestStreak = _currentStreak;
+    }
+
+    _lastSwipeDate = today;
+    _saveCounters();
+    _syncStreakToBackend();
+  }
+
+  /// Checks if the streak is still valid on app launch
+  void _validateStreak() {
+    if (_lastSwipeDate == null) return;
+    final today = _todayString();
+    final yesterday = _yesterdayString();
+
+    if (_lastSwipeDate != today && _lastSwipeDate != yesterday) {
+      // More than 1 day has passed - streak is broken
+      _currentStreak = 0;
+      _lastSwipeDate = null; // Clear the stale date in memory so it's not saved or validated again!
+      _saveCounters();
+      _syncStreakToBackend();
+    } else if (_lastSwipeDate == today && _currentStreak == 0) {
+      // Self-healing conflict resolution: if they have swiped today, their streak must be at least 1!
+      _currentStreak = 1;
+      _saveCounters();
+      _syncStreakToBackend();
+    }
+  }
+
+  /// Syncs the user's streak to the backend database
+  Future<void> _syncStreakToBackend() async {
+    if (_userId == null) return; // Do not sync guest/unauthenticated state
+    try {
+      await _apiClient.patch(
+        '/users/me',
+        body: {
+          'current_streak': _currentStreak,
+          'best_streak': _bestStreak,
+        },
+      );
+    } catch (e) {
+      debugPrint('⚠️ Failed to sync streak to backend: $e');
+    }
+  }
+
+  String _todayString() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  String _yesterdayString() {
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    return '${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}';
   }
 
   void incrementSmartDiscovery() {

@@ -22,7 +22,7 @@ class SocialService:
         """Fetch all accepted friends for a user with profile info."""
         try:
             response = self.db.client.table("friendships") \
-                .select("friend_id, created_at, profiles!friendships_friend_id_fkey(id, username, display_name, avatar_url)") \
+                .select("friend_id, created_at, profiles!friendships_friend_id_fkey(id, username, display_name, avatar_url, current_streak, best_streak)") \
                 .eq("user_id", user_id) \
                 .execute()
 
@@ -141,7 +141,7 @@ class SocialService:
         """Get pending incoming friend requests with sender profile."""
         try:
             res = self.db.client.table("friend_requests") \
-                .select("id, status, created_at, profiles!friend_requests_sender_id_fkey(id, username, display_name, avatar_url)") \
+                .select("id, status, created_at, profiles!friend_requests_sender_id_fkey(id, username, display_name, avatar_url, current_streak, best_streak)") \
                 .eq("receiver_id", user_id) \
                 .eq("status", "pending") \
                 .order("created_at", desc=True) \
@@ -155,7 +155,7 @@ class SocialService:
         """Get pending outgoing friend requests."""
         try:
             res = self.db.client.table("friend_requests") \
-                .select("id, status, created_at, profiles!friend_requests_receiver_id_fkey(id, username, display_name, avatar_url)") \
+                .select("id, status, created_at, profiles!friend_requests_receiver_id_fkey(id, username, display_name, avatar_url, current_streak, best_streak)") \
                 .eq("sender_id", user_id) \
                 .eq("status", "pending") \
                 .order("created_at", desc=True) \
@@ -361,7 +361,7 @@ class SocialService:
         try:
             # 1. Get matching users
             res = self.db.client.table("profiles") \
-                .select("id, username, display_name, avatar_url") \
+                .select("id, username, display_name, avatar_url, current_streak, best_streak") \
                 .ilike("username", f"%{query}%") \
                 .limit(10) \
                 .execute()

@@ -10,12 +10,17 @@ import 'package:movieswipe/features/users/presentation/widgets/genre_dna_chart.d
 import 'package:movieswipe/features/users/presentation/widgets/current_mood_aura.dart';
 import 'package:movieswipe/features/users/presentation/widgets/cover_selection_sheet.dart';
 import 'package:movieswipe/features/users/presentation/widgets/daily_activity_chart.dart';
+import 'package:movieswipe/features/users/presentation/widgets/streak_card.dart';
 import 'package:movieswipe/features/social/presentation/pages/social_dashboard_page.dart';
 import 'package:movieswipe/features/social/presentation/bloc/social_bloc.dart';
 import 'package:movieswipe/features/social/presentation/bloc/social_event.dart';
 import 'package:movieswipe/features/social/presentation/bloc/social_state.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:movieswipe/core/presentation/widgets/logo_loader.dart';
+import 'package:movieswipe/features/social/presentation/pages/movie_dm_list_page.dart';
+import 'package:movieswipe/features/social/presentation/bloc/dm_bloc.dart';
+import 'package:movieswipe/core/di/injection_container.dart';
+import 'package:movieswipe/features/users/presentation/pages/about_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -90,6 +95,14 @@ class _ProfilePageState extends State<ProfilePage> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20.0),
                     child: _buildAiInsightCards(likedProvider),
+                  ),
+                ),
+
+                // Streak Card
+                SliverToBoxAdapter(
+                  child: StreakCard(
+                    currentStreak: likedProvider.currentStreak,
+                    bestStreak: likedProvider.bestStreak,
                   ),
                 ),
 
@@ -297,11 +310,14 @@ class _ProfilePageState extends State<ProfilePage> {
                         const SizedBox(height: 4),
 
                         _buildDrawerItem(
-                          icon: Icons.settings_rounded,
-                          label: 'Ayarlar',
+                          icon: Icons.info_outline_rounded,
+                          label: 'Hakkında',
                           onTap: () {
                             Navigator.pop(context);
-                            // TODO: Navigate to settings page
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const AboutPage()),
+                            );
                           },
                         ),
                       ],
@@ -473,6 +489,28 @@ class _ProfilePageState extends State<ProfilePage> {
                         color: AppTheme.accent, size: 20),
                   ),
                 ),
+              IconButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => BlocProvider(
+                        create: (_) => sl<DmBloc>(),
+                        child: const MovieDmListPage(),
+                      ),
+                    ),
+                  );
+                },
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.local_play_outlined,
+                      color: Colors.white, size: 20),
+                ),
+              ),
               IconButton(
                 onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
                 icon: Container(

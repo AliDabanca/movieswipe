@@ -98,7 +98,114 @@ class _CollectionDetailPageState extends State<CollectionDetailPage> {
               ? _buildErrorState()
               : _detail!.movies.isEmpty
                   ? _buildEmptyState()
-                  : _buildMovieList(),
+                  : Column(
+                      children: [
+                        _buildProgressCard(),
+                        Expanded(child: _buildMovieList()),
+                      ],
+                    ),
+    );
+  }
+
+  Widget _buildProgressCard() {
+    final movies = _detail?.movies ?? [];
+    if (movies.isEmpty) return const SizedBox.shrink();
+
+    final likedProvider = context.watch<LikedMoviesProvider>();
+    final watchedCount = movies.where((m) {
+      return likedProvider.recentlyAddedAll.any(
+        (liked) => liked['id'] == m.id && liked['watch_status'] == 'watched'
+      );
+    }).length;
+
+    final percent = watchedCount / movies.length;
+    final percentString = (percent * 100).toStringAsFixed(0);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF16213E),
+            const Color(0xFF0F3460).withValues(alpha: 0.8),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Circular Progress Indicator
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 60,
+                height: 60,
+                child: CircularProgressIndicator(
+                  value: percent,
+                  strokeWidth: 6,
+                  backgroundColor: Colors.white.withValues(alpha: 0.1),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF7C4DFF)),
+                ),
+              ),
+              Text(
+                '$percentString%',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 18),
+          // Progress text
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Koleksiyon İlerlemesi',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${movies.length} filmden $watchedCount tanesini izledin.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: percent,
+                    minHeight: 4,
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF7C4DFF)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -226,7 +333,7 @@ class _CollectionDetailPageState extends State<CollectionDetailPage> {
                         imageUrl: posterUrl,
                         fit: BoxFit.cover,
                         width: double.infinity,
-                        placeholder: (_, __) => Container(
+                        placeholder: (_, _) => Container(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
@@ -242,7 +349,7 @@ class _CollectionDetailPageState extends State<CollectionDetailPage> {
                             ),
                           ),
                         ),
-                        errorWidget: (_, e1, e2) => Container(
+                        errorWidget: (_, _, _) => Container(
                           decoration: const BoxDecoration(
                             gradient: LinearGradient(
                               colors: [Color(0xFF6366F1), Color(0xFFEC4899)],
@@ -499,7 +606,7 @@ class _AddFromMyListSheetState extends State<_AddFromMyListSheet> {
               Expanded(
                 child: ListView.separated(
                   itemCount: filteredMovies.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final movie = filteredMovies[index];
                     final movieId = movie['id'] as int;
@@ -526,7 +633,7 @@ class _AddFromMyListSheetState extends State<_AddFromMyListSheet> {
                             width: 45,
                             height: 65,
                             fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => Container(
+                            errorWidget: (_, _, _) => Container(
                               width: 45,
                               height: 65,
                               color: Colors.white12,
@@ -583,7 +690,7 @@ class _AddFromMyListSheetState extends State<_AddFromMyListSheet> {
                                   ),
                                 );
 
-                                if (mounted) {
+                                if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text('$movieName eklendi!'),

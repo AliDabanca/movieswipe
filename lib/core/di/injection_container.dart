@@ -12,6 +12,9 @@ import 'package:movieswipe/features/movies/presentation/bloc/movies_bloc.dart';
 import 'package:movieswipe/features/social/domain/repositories/social_repository.dart';
 import 'package:movieswipe/features/social/data/repositories/social_repository_impl.dart';
 import 'package:movieswipe/features/social/presentation/bloc/social_bloc.dart';
+import 'package:movieswipe/features/social/domain/repositories/dm_repository.dart';
+import 'package:movieswipe/features/social/data/repositories/dm_repository_impl.dart';
+import 'package:movieswipe/features/social/presentation/bloc/dm_bloc.dart';
 
 final sl = GetIt.instance;
 
@@ -28,6 +31,10 @@ Future<void> init() async {
 
   sl.registerFactory(
     () => SocialBloc(repository: sl()),
+  );
+
+  sl.registerFactory(
+    () => DmBloc(repository: sl()),
   );
 
   // Use cases
@@ -47,6 +54,10 @@ Future<void> init() async {
     () => SocialRepositoryImpl(sl()),
   );
 
+  sl.registerLazySingleton<DmRepository>(
+    () => DmRepositoryImpl(sl()),
+  );
+
   // Data sources
   sl.registerLazySingleton<MovieRemoteDataSource>(
     () => MovieRemoteDataSourceImpl(apiClient: sl()),
@@ -59,3 +70,4 @@ Future<void> init() async {
   sl.registerLazySingleton(() => ApiClient(client: sl()));
   sl.registerLazySingleton(() => http.Client());
 }
+

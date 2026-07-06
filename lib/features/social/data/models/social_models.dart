@@ -9,6 +9,8 @@ class FriendModel extends FriendEntity {
     super.avatarUrl,
     super.isFriend,
     super.isSelf,
+    super.currentStreak,
+    super.bestStreak,
   });
 
   factory FriendModel.fromJson(Map<String, dynamic> json) {
@@ -19,6 +21,8 @@ class FriendModel extends FriendEntity {
       avatarUrl: json['avatar_url'] as String?,
       isFriend: json['is_friend'] as bool? ?? false,
       isSelf: json['is_self'] as bool? ?? false,
+      currentStreak: json['current_streak'] as int? ?? 0,
+      bestStreak: json['best_streak'] as int? ?? 0,
     );
   }
 }
