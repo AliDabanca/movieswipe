@@ -56,7 +56,11 @@ class SchedulerService:
         try:
             from app.data.datasources.supabase_datasource import SupabaseDataSource
             ds = SupabaseDataSource()
-            count_resp = ds.client.table("movies").select("id", count="exact").limit(1).execute()
+            # CRITICAL: run synchronous Supabase call in a thread to avoid
+            # blocking the asyncio event loop (which would freeze uvicorn)
+            count_resp = await asyncio.to_thread(
+                lambda: ds.client.table("movies").select("id", count="exact").limit(1).execute()
+            )
             movie_count = count_resp.count or 0
             
             if movie_count > 0:
