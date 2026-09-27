@@ -160,6 +160,7 @@ flutter run
 | Environment | File        | Usage |
 | ----------- | ----------- | ----- |
 | Development | `.env.dev`  | Local testing with local backend |
+| Ngrok (Demo)| `.env.ngrok`| Wireless physical device testing / Demos |
 | Test        | `.env.test` | Testing with test server |
 | Production  | `.env.prod` | Production deployment |
 
@@ -168,6 +169,9 @@ Run with flavor:
 ```bash
 # Development
 flutter run --dart-define=FLAVOR=dev
+
+# Ngrok (Wireless Demo)
+flutter run --release --dart-define=FLAVOR=ngrok
 
 # Test
 flutter run --dart-define=FLAVOR=test
@@ -180,7 +184,7 @@ flutter run --dart-define=FLAVOR=prod
 
 ## 📱 Testing on Physical Device
 
-### Important: Network Setup
+### Method 1: Local Network (Same WiFi)
 
 1. **Connect to Same WiFi:** Ensure your phone and computer are on the **same WiFi network**
 2. **Get Your IP:** Run `ipconfig` (Windows) or `ifconfig` (Mac/Linux)
@@ -204,6 +208,16 @@ http://YOUR_LOCAL_IP:8000
 ```
 
 You should see a JSON response with API info.
+
+### Method 2: Wireless & Remote (Ngrok - Recommended for Demos)
+
+If you want to present the app without being tied to the same WiFi network or keeping your phone plugged in:
+
+1. Create an account on [Ngrok](https://ngrok.com/) and authenticate your machine (gives you a free static domain).
+2. Create `.env.ngrok` and set `BASE_URL` to your static Ngrok URL (e.g., `https://<your-static-domain>.ngrok-free.dev`).
+3. Run `start_ngrok.bat` to launch both FastAPI and the Ngrok tunnel with one click.
+4. Install the app on your phone: `flutter run --release --dart-define=FLAVOR=ngrok`
+5. Once the app opens, **unplug the cable**. The app will securely connect to your PC's backend from anywhere in the world!
 
 ---
 
