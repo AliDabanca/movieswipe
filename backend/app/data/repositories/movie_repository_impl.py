@@ -31,7 +31,7 @@ class MovieRepositoryImpl(MovieRepository):
             # If Supabase is empty and TMDB is available, fetch from TMDB and save
             if not movies_data and self.tmdb_service:
                 import asyncio
-                print("📡 Fetching movies from TMDB (5 pages = ~100 movies)...")
+                print(" Fetching movies from TMDB (5 pages = ~100 movies)...")
                 
                 # Using asyncio.run here is safe because this runs in FastAPI's threadpool thread
                 # which doesn't have a running asyncio loop
@@ -45,7 +45,7 @@ class MovieRepositoryImpl(MovieRepository):
                         
                     page_movies = loop.run_until_complete(self.tmdb_service.get_popular_movies(page=page))
                     all_tmdb_movies.extend(page_movies)
-                    print(f"  📄 Page {page}/5: {len(page_movies)} movies")
+                    print(f"   Page {page}/5: {len(page_movies)} movies")
                 
                 # Transform TMDB data to our format
                 movies_to_save = []
@@ -59,24 +59,24 @@ class MovieRepositoryImpl(MovieRepository):
                     movies_to_save.append(movie_dict)
                 
                 # Save to Supabase
-                print(f"💾 Caching {len(movies_to_save)} movies to Supabase...")
+                print(f" Caching {len(movies_to_save)} movies to Supabase...")
                 movies_data = self.supabase_ds.save_movies_batch(movies_to_save)
-                print(f"✅ {len(movies_data)} movies cached successfully!")
+                print(f" {len(movies_data)} movies cached successfully!")
             elif not movies_data:
-                print("⚠️  No movies in Supabase and TMDB key not configured")
+                print("  No movies in Supabase and TMDB key not configured")
                 return []
             
             # Convert to domain entities
             return [MovieModel(**movie_data).to_entity() for movie_data in movies_data]
             
         except Exception as e:
-            print(f"⚠️  Error fetching movies: {e}")
+            print(f"  Error fetching movies: {e}")
             
             # If Supabase fails and TMDB is available, fallback to TMDB directly
             if self.tmdb_service:
                 import asyncio
                 try:
-                    print("🔄 Falling back to TMDB (1 page)...")
+                    print(" Falling back to TMDB (1 page)...")
                     try:
                         loop = asyncio.get_event_loop()
                     except RuntimeError:
@@ -97,7 +97,7 @@ class MovieRepositoryImpl(MovieRepository):
                     
                     return movies
                 except Exception as tmdb_error:
-                    print(f"❌ TMDB fallback failed: {tmdb_error}")
+                    print(f" TMDB fallback failed: {tmdb_error}")
             
             return []
 
@@ -109,7 +109,7 @@ class MovieRepositoryImpl(MovieRepository):
         except NotFoundError:
             return None
         except Exception as e:
-            print(f"⚠️  Error fetching movie {movie_id}: {e}")
+            print(f"  Error fetching movie {movie_id}: {e}")
             return None
 
     def create(self, movie: Movie) -> Movie:
@@ -126,7 +126,7 @@ class MovieRepositoryImpl(MovieRepository):
             # Check if error is related to foreign key constraint (movie_id not found)
             error_str = str(e).lower()
             if "foreign key constraint" in error_str or "violates foreign key" in error_str:
-                print(f"⚠️ Movie {movie_id} missing in DB. Attempting Just-in-Time import...")
+                print(f" Movie {movie_id} missing in DB. Attempting Just-in-Time import...")
                 
                 if not self.tmdb_service:
                     raise ServerError("TMDB service not available for auto-import")
@@ -150,29 +150,29 @@ class MovieRepositoryImpl(MovieRepository):
                         "poster_path": tmdb_movie.get("poster_path")
                     }
                     self.supabase_ds.save_movie(movie_dict)
-                    print(f"✅ Auto-imported movie: {tmdb_movie['title']}")
+                    print(f" Auto-imported movie: {tmdb_movie['title']}")
                     
                     # Retry swipe
                     self.supabase_ds.save_swipe(user_id, movie_id, is_like, rating)
-                    print(f"✅ Retry swipe successful for movie {movie_id}")
+                    print(f" Retry swipe successful for movie {movie_id}")
                     return
                 except Exception as import_error:
-                    print(f"❌ Failed to auto-import movie {movie_id}: {import_error}")
+                    print(f" Failed to auto-import movie {movie_id}: {import_error}")
                     raise e
             
             # Re-raise other errors
             raise e
         
         action = "LIKE" if is_like else "PASS"
-        print(f"✅ Swipe saved to DB: User {user_id} - Movie {movie_id} - {action} (Rating: {rating})")
+        print(f" Swipe saved to DB: User {user_id} - Movie {movie_id} - {action} (Rating: {rating})")
 
     def delete_swipe(self, movie_id: int, user_id: str) -> None:
         """Delete a swipe record (unlike/unpass)."""
         try:
             self.supabase_ds.delete_swipe(user_id, movie_id)
-            print(f"✅ Swipe deleted from DB: User {user_id} - Movie {movie_id}")
+            print(f" Swipe deleted from DB: User {user_id} - Movie {movie_id}")
         except Exception as e:
-            print(f"❌ Failed to delete swipe for user {user_id}, movie {movie_id}: {e}")
+            print(f" Failed to delete swipe for user {user_id}, movie {movie_id}: {e}")
             raise e
     
     def _extract_genre(self, tmdb_movie: dict) -> str:

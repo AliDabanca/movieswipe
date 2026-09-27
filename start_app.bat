@@ -10,7 +10,7 @@ echo.
 
 :: Backend'i arka planda baslat
 echo [1/3] Backend baslatiliyor...
-start "MovieSwipe Backend" cmd /k "cd /d %~dp0backend && python -m uvicorn app.presentation.api.main:app --reload --host 0.0.0.0 --port 8000"
+start "MovieSwipe Backend" cmd /k "cd /d %~dp0 && call .venv\Scripts\activate.bat && cd backend && python -m uvicorn app.presentation.api.main:app --reload --host 0.0.0.0 --port 8000"
 
 :: Backend'in hazir olmasini bekle
 echo [2/3] Backend'in hazir olmasi bekleniyor...
